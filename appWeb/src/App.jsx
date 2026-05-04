@@ -60,7 +60,7 @@ function App() {
           <Route path="/inventario" element={<InventarioPage />} />
           <Route path="/stock" element={<StockPage />} />
           <Route path="/caja" element={
-            <PrivateRoute requiredRole="gerente">
+            <PrivateRoute>
               <CajaPage />
             </PrivateRoute>
           } />

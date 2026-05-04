@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { getDocs, collection, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
 
 export const LoginPage = () => {
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,23 +30,30 @@ export const LoginPage = () => {
     setLoading(true);
 
     try {
-      const userCredential = await login(email, password);
+      const emailConvertido = `${username.toLowerCase().trim()}@santos.com`;
+      const userCredential = await signInWithEmailAndPassword(auth, emailConvertido, password);
       const uid = userCredential.user.uid;
       
       const userDoc = await getDoc(doc(db, 'users', uid));
       if (!userDoc.exists()) {
-        await setDoc(doc(db, 'users', uid), {
-          email,
-          nombre: email.split('@')[0],
-          rol: 'empleado',
-          creadoEn: new Date().toISOString(),
-        });
+        await signOut(auth);
+        setError('Usuario no autorizado. Contacta al administrador.');
+        setLoading(false);
+        return;
+      }
+      
+      const userData = userDoc.data();
+      if (userData.activo === false) {
+        await signOut(auth);
+        setError('Usuario deshabilitado. Contacta al administrador.');
+        setLoading(false);
+        return;
       }
     } catch (err) {
       if (err.code === 'auth/invalid-credential') {
-        setError('Email o contraseña incorrectos');
+        setError('Usuario o contraseña incorrectos');
       } else if (err.code === 'auth/invalid-email') {
-        setError('Email inválido');
+        setError('Usuario inválido');
       } else if (err.code === 'auth/user-disabled') {
         setError('Usuario deshabilitado');
       } else {
@@ -79,12 +85,12 @@ export const LoginPage = () => {
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="block text-gray-700 text-sm font-bold mb-2">
-                Correo electrónico
+                Usuario
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               />

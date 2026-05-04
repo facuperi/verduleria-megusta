@@ -13,7 +13,7 @@ export const UsuariosPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
-  const [formData, setFormData] = useState({ email: '', password: '', nombre: '', rol: 'empleado' });
+  const [formData, setFormData] = useState({ email: '', password: '', nombre: '', rol: 'empleado', activo: true });
 
   const restriction = checkDeviceRestriction('gestionarUsuarios');
   const canAccess = !isMobile && isGerente;
@@ -39,6 +39,7 @@ export const UsuariosPage = () => {
         await updateDoc(doc(db, 'users', editando.id), {
           nombre: formData.nombre,
           rol: formData.rol,
+          activo: formData.activo,
         });
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
@@ -46,13 +47,14 @@ export const UsuariosPage = () => {
           email: formData.email,
           nombre: formData.nombre,
           rol: formData.rol,
+          activo: true,
           creadoPor: user.uid,
           creadoEn: new Date().toISOString(),
         });
       }
       setShowModal(false);
       setEditando(null);
-      setFormData({ email: '', password: '', nombre: '', rol: 'empleado' });
+      setFormData({ email: '', password: '', nombre: '', rol: 'empleado', activo: true });
       
       const snapshot = await getDocs(collection(db, 'users'));
       setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -70,7 +72,7 @@ export const UsuariosPage = () => {
 
   const abrirEditar = (usuario) => {
     setEditando(usuario);
-    setFormData({ nombre: usuario.nombre, rol: usuario.rol, email: '', password: '' });
+    setFormData({ nombre: usuario.nombre, rol: usuario.rol, email: '', password: '', activo: usuario.activo !== false });
     setShowModal(true);
   };
 
@@ -93,7 +95,7 @@ export const UsuariosPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
         <button
-          onClick={() => { setShowModal(true); setEditando(null); setFormData({ email: '', password: '', nombre: '', rol: 'empleado' }); }}
+          onClick={() => { setShowModal(true); setEditando(null); setFormData({ email: '', password: '', nombre: '', rol: 'empleado', activo: true }); }}
           className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
         >
           Agregar Usuario

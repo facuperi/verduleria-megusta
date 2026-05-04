@@ -6,7 +6,7 @@ import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
 export const CajaPage = () => {
-  const { isGerente, user } = useAuth();
+  const { user } = useAuth();
   const { isMobile } = useDevice();
   const [caja, setCaja] = useState(null);
   const [ventasHoy, setVentasHoy] = useState([]);
@@ -100,14 +100,6 @@ export const CajaPage = () => {
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
           {restriction.message}
         </div>
-      </Layout>
-    );
-  }
-
-  if (!isGerente) {
-    return (
-      <Layout>
-        <div className="text-center py-8 text-red-600">No tienes acceso a esta página</div>
       </Layout>
     );
   }

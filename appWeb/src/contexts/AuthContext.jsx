@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 const AuthContext = createContext({});
@@ -15,9 +15,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const snapshot = await getDocs(collection(db, 'users'));
-        const userDoc = snapshot.docs.find(d => d.data().email === firebaseUser.email);
-        const role = userDoc ? userDoc.data().rol : 'empleado';
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const role = userDoc.exists() ? userDoc.data().rol : 'empleado';
         setUser({ ...firebaseUser, role });
         setUserRole(role);
       } else {
