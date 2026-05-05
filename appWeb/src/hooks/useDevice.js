@@ -30,6 +30,7 @@ export const checkDeviceRestriction = (feature) => {
     aperturaCaja: { allowed: ['desktop'], message: 'La apertura de caja solo puede realizarse desde PC' },
     reportes: { allowed: ['desktop'], message: 'Los reportes solo pueden verse desde PC' },
     gestionarUsuarios: { allowed: ['desktop'], message: 'La gestión de usuarios solo puede realizarse desde PC' },
+    gestionarInventario: { allowed: ['desktop'], message: 'Solo gerentes pueden gestionar inventario desde PC' },
   };
   
   return restrictions[feature] || { allowed: ['desktop', 'mobile'], message: '' };
