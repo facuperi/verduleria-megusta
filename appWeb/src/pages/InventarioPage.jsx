@@ -5,10 +5,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
-const NEGOCIOS = ['chiclana', 'belgrano'];
+const NEGOCIOS = [
+  { id: 'chiclana', nombre: 'Chiclana' },
+  { id: 'belgrano', nombre: 'Belgrano' },
+];
 
 export const InventarioPage = () => {
-  const { isGerente, user } = useAuth();
+  const { isGerente } = useAuth();
   const { isMobile } = useDevice();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,17 +20,19 @@ export const InventarioPage = () => {
   const [busqueda, setBusqueda] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [mostrarGlobal, setMostrarGlobal] = useState(false);
   const [formData, setFormData] = useState({
     codigoBarras: '',
     codigoInterno: '',
     nombre: '',
-    precio: '',
+    precioEfectivo: '',
+    precioTarjeta: '',
     stockChiclana: 0,
     stockBelgrano: 0,
   });
 
   const restriction = checkDeviceRestriction('gestionarInventario');
-  const canAccess = isGerente && !isMobile;
+  const puedeEditar = isGerente && !isMobile;
 
   const calcularStockGlobal = (stockChiclana, stockBelgrano) => {
     return (parseInt(stockChiclana) || 0) + (parseInt(stockBelgrano) || 0);
@@ -57,7 +62,8 @@ export const InventarioPage = () => {
         codigoBarras: formData.codigoBarras.trim(),
         codigoInterno: formData.codigoInterno.trim(),
         nombre: formData.nombre.trim(),
-        precio: parseFloat(formData.precio),
+        precioEfectivo: parseFloat(formData.precioEfectivo) || 0,
+        precioTarjeta: parseFloat(formData.precioTarjeta) || 0,
         stockPorNegocio: {
           chiclana: parseInt(formData.stockChiclana) || 0,
           belgrano: parseInt(formData.stockBelgrano) || 0,
@@ -74,7 +80,7 @@ export const InventarioPage = () => {
 
       setShowModal(false);
       setEditando(null);
-      setFormData({ codigoBarras: '', codigoInterno: '', nombre: '', precio: '', stockChiclana: 0, stockBelgrano: 0 });
+      setFormData({ codigoBarras: '', codigoInterno: '', nombre: '', precioEfectivo: '', precioTarjeta: '', stockChiclana: 0, stockBelgrano: 0 });
       
       const snapshot = await getDocs(collection(db, 'productos'));
       setProductos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -106,7 +112,8 @@ export const InventarioPage = () => {
       codigoBarras: producto.codigoBarras || '',
       codigoInterno: producto.codigoInterno || '',
       nombre: producto.nombre || '',
-      precio: producto.precio?.toString() || '',
+      precioEfectivo: producto.precioEfectivo?.toString() || '',
+      precioTarjeta: producto.precioTarjeta?.toString() || '',
       stockChiclana: producto.stockPorNegocio?.chiclana || 0,
       stockBelgrano: producto.stockPorNegocio?.belgrano || 0,
     });
@@ -123,26 +130,28 @@ export const InventarioPage = () => {
     return <Layout><div className="text-center py-8">Cargando...</div></Layout>;
   }
 
-  if (!canAccess) {
-    return (
-      <Layout>
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
-          {restriction.message || 'Solo gerentes pueden gestionar inventario desde PC'}
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Inventario</h2>
-        <button
-          onClick={() => { setShowModal(true); setEditando(null); setFormData({ codigoBarras: '', codigoInterno: '', nombre: '', precio: '', stockChiclana: 0, stockBelgrano: 0 }); }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-        >
-          Agregar Producto
-        </button>
+        <h2 className="text-2xl font-bold">Inventario y Stock</h2>
+        <div className="flex gap-2">
+          {isGerente && (
+            <button
+              onClick={() => setMostrarGlobal(!mostrarGlobal)}
+              className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-gray-200'}`}
+            >
+              {mostrarGlobal ? 'Ver por Negocio' : 'Ver Global'}
+            </button>
+          )}
+          {puedeEditar && (
+            <button
+              onClick={() => { setShowModal(true); setEditando(null); setFormData({ codigoBarras: '', codigoInterno: '', nombre: '', precioEfectivo: '', precioTarjeta: '', stockChiclana: 0, stockBelgrano: 0 }); }}
+              className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+            >
+              + Agregar Producto
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-4">
@@ -161,11 +170,18 @@ export const InventarioPage = () => {
             <tr>
               <th className="px-4 py-2 text-left">Código</th>
               <th className="px-4 py-2 text-left">Nombre</th>
-              <th className="px-4 py-2 text-right">Precio</th>
-              <th className="px-4 py-2 text-center">Chiclana</th>
-              <th className="px-4 py-2 text-center">Belgrano</th>
-              <th className="px-4 py-2 text-center">Total</th>
-              <th className="px-4 py-2 text-right">Acciones</th>
+              <th className="px-4 py-2 text-right">Precios (EF/TJ)</th>
+              {mostrarGlobal ? (
+                <th className="px-4 py-2 text-center">Stock Global</th>
+              ) : (
+                <>
+                  <th className="px-4 py-2 text-center">Chiclana</th>
+                  <th className="px-4 py-2 text-center">Belgrano</th>
+                </>
+              )}
+              {puedeEditar && (
+                <th className="px-4 py-2 text-right">Acciones</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -173,18 +189,40 @@ export const InventarioPage = () => {
               <tr key={producto.id} className="border-t">
                 <td className="px-4 py-2 text-sm">{producto.codigoInterno}</td>
                 <td className="px-4 py-2">{producto.nombre}</td>
-                <td className="px-4 py-2 text-right">${producto.precio}</td>
-                <td className="px-4 py-2 text-center">{producto.stockPorNegocio?.chiclana || 0}</td>
-                <td className="px-4 py-2 text-center">{producto.stockPorNegocio?.belgrano || 0}</td>
-                <td className="px-4 py-2 text-center font-semibold">{producto.stockGlobal || 0}</td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => abrirEditar(producto)} className="text-blue-600 hover:text-blue-800 mr-2">
-                    Editar
-                  </button>
-                  <button onClick={() => eliminarProducto(producto.id)} disabled={eliminando} className="text-red-600 hover:text-red-800 disabled:opacity-50">
-                    {eliminando ? '...' : 'Eliminar'}
-                  </button>
+                  <span className="block">EF: ${producto.precioEfectivo}</span>
+                  <span className="text-gray-500 text-sm">TJ: ${producto.precioTarjeta}</span>
                 </td>
+                {mostrarGlobal ? (
+                  <td className="px-4 py-2 text-center">
+                    <span className={`font-semibold ${producto.stockGlobal > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {producto.stockGlobal || 0}
+                    </span>
+                  </td>
+                ) : (
+                  <>
+                    <td className="px-4 py-2 text-center">
+                      <span className={`font-semibold ${producto.stockPorNegocio?.chiclana > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {producto.stockPorNegocio?.chiclana || 0}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <span className={`font-semibold ${producto.stockPorNegocio?.belgrano > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {producto.stockPorNegocio?.belgrano || 0}
+                      </span>
+                    </td>
+                  </>
+                )}
+                {puedeEditar && (
+                  <td className="px-4 py-2 text-right">
+                    <button onClick={() => abrirEditar(producto)} className="text-blue-600 hover:text-blue-800 mr-2">
+                      Editar
+                    </button>
+                    <button onClick={() => eliminarProducto(producto.id)} disabled={eliminando} className="text-red-600 hover:text-red-800 disabled:opacity-50">
+                      {eliminando ? '...' : 'Eliminar'}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -194,7 +232,7 @@ export const InventarioPage = () => {
         )}
       </div>
 
-      {showModal && (
+      {showModal && puedeEditar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-full max-w-md">
             <h3 className="text-xl font-bold mb-4">{editando ? 'Editar' : 'Agregar'} Producto</h3>
@@ -229,16 +267,29 @@ export const InventarioPage = () => {
                   required
                 />
               </div>
-              <div className="mb-3">
-                <label className="block text-sm font-bold mb-1">Precio</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.precio}
-                  onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
-                  className="w-full border p-2 rounded"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <label className="block text-sm font-bold mb-1">Precio Efectivo</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.precioEfectivo}
+                    onChange={(e) => setFormData({ ...formData, precioEfectivo: e.target.value })}
+                    className="w-full border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1">Precio Tarjeta</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.precioTarjeta}
+                    onChange={(e) => setFormData({ ...formData, precioTarjeta: e.target.value })}
+                    className="w-full border p-2 rounded"
+                    required
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <div>

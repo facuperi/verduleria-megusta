@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { VentasPage } from './pages/VentasPage';
 import { InventarioPage } from './pages/InventarioPage';
-import { StockPage } from './pages/StockPage';
 import { CajaPage } from './pages/CajaPage';
 import { ReportesPage } from './pages/ReportesPage';
 import { UsuariosPage } from './pages/UsuariosPage';
@@ -58,7 +57,6 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/ventas" element={<VentasPage />} />
           <Route path="/inventario" element={<InventarioPage />} />
-          <Route path="/stock" element={<StockPage />} />
           <Route path="/caja" element={
             <PrivateRoute>
               <CajaPage />

@@ -1,15 +1,19 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useDevice } from '../hooks/useDevice';
 
 export const Layout = ({ children }) => {
+  const navigate = useNavigate();
   const { user, userRole, logout } = useAuth();
   const { isMobile } = useDevice();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = async () => {
     try {
       await logout();
+      navigate('/login');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
@@ -40,10 +44,12 @@ export const Layout = ({ children }) => {
                     {!isMobile && (
                       <>
                         <a href="/ventas" className="px-3 py-2 rounded hover:bg-indigo-700">Ventas</a>
-                        <a href="/inventario" className="px-3 py-2 rounded hover:bg-indigo-700">Inventario</a>
+                        <a href="/inventario" className="px-3 py-2 rounded hover:bg-indigo-700">Inventario y Stock</a>
                       </>
                     )}
-                    <a href="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</a>
+                    {isMobile && (
+                      <a href="/inventario" className="px-3 py-2 rounded hover:bg-indigo-700">Inventario</a>
+                    )}
                     <a href="/caja" className="px-3 py-2 rounded hover:bg-indigo-700">Caja</a>
                     {!isMobile && userRole === 'gerente' && (
                       <>
@@ -51,7 +57,7 @@ export const Layout = ({ children }) => {
                         <a href="/usuarios" className="px-3 py-2 rounded hover:bg-indigo-700">Usuarios</a>
                       </>
                     )}
-                    <button onClick={handleLogout} className="px-3 py-2 rounded hover:bg-indigo-700 text-left">
+                    <button onClick={() => setShowLogoutModal(true)} className="px-3 py-2 rounded hover:bg-indigo-700 text-left">
                       Cerrar sesión
                     </button>
                   </div>
@@ -65,6 +71,29 @@ export const Layout = ({ children }) => {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {children}
       </main>
+
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Cerrar sesión</h3>
+            <p className="text-gray-600 mb-6">¿Estás seguro de que quieres cerrar sesión?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleLogout}
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
+              >
+                Sí, cerrar sesión
+              </button>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

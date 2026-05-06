@@ -21,12 +21,19 @@ export const ReportesPage = () => {
         let ventasData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
         if (filtro === 'hoy') {
-          const today = startOfDay(now);
-          ventasData = ventasData.filter(v => v.fecha?.toDate?.() >= today);
+          ventasData = ventasData.filter(v => {
+            const fechaVenta = v.fecha?.toDate ? v.fecha.toDate() : new Date(v.fecha);
+            return fechaVenta >= todayStart;
+          });
         } else if (filtro === 'semana') {
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          ventasData = ventasData.filter(v => v.fecha?.toDate?.() >= weekAgo);
+          ventasData = ventasData.filter(v => {
+            const fechaVenta = v.fecha?.toDate ? v.fecha.toDate() : new Date(v.fecha);
+            return fechaVenta >= weekAgo;
+          });
         }
         
         setVentas(ventasData);

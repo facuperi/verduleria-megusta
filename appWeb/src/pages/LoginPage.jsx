@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { Layout } from '../components/Layout';
 
 export const LoginPage = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -49,6 +51,7 @@ export const LoginPage = () => {
         setLoading(false);
         return;
       }
+      navigate('/ventas');
     } catch (err) {
       if (err.code === 'auth/invalid-credential') {
         setError('Usuario o contraseña incorrectos');
