@@ -44,15 +44,16 @@ export const Layout = ({ children }) => {
                     {!isMobile && (
                       <>
                         <a href="/ventas" className="px-3 py-2 rounded hover:bg-indigo-700">Ventas</a>
-                        <a href="/inventario" className="px-3 py-2 rounded hover:bg-indigo-700">Inventario y Stock</a>
+                        <a href="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</a>
                       </>
                     )}
                     {isMobile && (
-                      <a href="/inventario" className="px-3 py-2 rounded hover:bg-indigo-700">Inventario</a>
+                      <a href="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</a>
                     )}
                     <a href="/caja" className="px-3 py-2 rounded hover:bg-indigo-700">Caja</a>
                     {!isMobile && userRole === 'gerente' && (
                       <>
+                        <a href="/movimientos" className="px-3 py-2 rounded hover:bg-indigo-700">Movimientos</a>
                         <a href="/reportes" className="px-3 py-2 rounded hover:bg-indigo-700">Reportes</a>
                         <a href="/usuarios" className="px-3 py-2 rounded hover:bg-indigo-700">Usuarios</a>
                       </>

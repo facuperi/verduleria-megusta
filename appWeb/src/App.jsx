@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { VentasPage } from './pages/VentasPage';
-import { InventarioPage } from './pages/InventarioPage';
+import { StockPage } from './pages/StockPage';
+import { MovimientosPage } from './pages/MovimientosPage';
 import { CajaPage } from './pages/CajaPage';
 import { ReportesPage } from './pages/ReportesPage';
 import { UsuariosPage } from './pages/UsuariosPage';
@@ -56,7 +57,12 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/ventas" element={<VentasPage />} />
-          <Route path="/inventario" element={<InventarioPage />} />
+          <Route path="/stock" element={<StockPage />} />
+          <Route path="/movimientos" element={
+            <PrivateRoute requiredRole="gerente">
+              <MovimientosPage />
+            </PrivateRoute>
+          } />
           <Route path="/caja" element={
             <PrivateRoute>
               <CajaPage />
