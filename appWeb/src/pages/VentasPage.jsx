@@ -22,11 +22,37 @@ export const VentasPage = () => {
   const [error, setError] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [caja, setCaja] = useState(null);
+  const [observacion, setObservacion] = useState('');
   
   // Métodos de pago seleccionados
   const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0 }]);
   
   const inputScannerRef = useRef(null);
+
+  const totalVenta = carrito
+    .filter(p => !p.esNotaCredito)
+    .reduce((sum, p) => {
+      const precio = p.precioSeleccionado === 'tarjeta' ? p.precioTarjeta : p.precioEfectivo;
+      return sum + (precio * p.cantidad);
+    }, 0);
+
+  const totalNotaCredito = carrito
+    .filter(p => p.esNotaCredito)
+    .reduce((sum, p) => {
+      const precio = p.precioSeleccionado === 'tarjeta' ? p.precioTarjeta : p.precioEfectivo;
+      return sum + (precio * p.cantidad);
+    }, 0);
+
+  const diferencia = totalVenta - totalNotaCredito;
+  const total = Math.max(0, diferencia);
+
+  useEffect(() => {
+    if (carrito.length > 0 && diferencia > 0) {
+      setPagosSeleccionados([{ metodo: 'efectivo', monto: diferencia }]);
+    } else if (carrito.length > 0 && diferencia <= 0) {
+      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
+    }
+  }, [carrito.length, diferencia]);
   
   const restriction = checkDeviceRestriction('venta');
   const canSell = !isMobile || restriction.allowed.includes('mobile');
@@ -72,35 +98,36 @@ export const VentasPage = () => {
   };
 
   const agregarAlCarrito = (producto, tipoPrecio = 'efectivo') => {
-    const existe = carrito.find(p => p.id === producto.id);
+    const existe = carrito.find(p => p.id === producto.id && p.precioSeleccionado === tipoPrecio);
     if (existe) {
       setCarrito(carrito.map(p => 
-        p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
+        p.id === producto.id && p.precioSeleccionado === tipoPrecio ? { ...p, cantidad: p.cantidad + 1 } : p
       ));
     } else {
-      setCarrito([...carrito, { ...producto, cantidad: 1, precioSeleccionado: tipoPrecio }]);
+      setCarrito([...carrito, { ...producto, cantidad: 1, precioSeleccionado: tipoPrecio, esNotaCredito: false }]);
     }
     setBusqueda('');
   };
 
-  const quitarDelCarrito = (productoId) => {
-    setCarrito(carrito.filter(p => p.id !== productoId));
+  const quitarDelCarrito = (productoId, precioSeleccionado) => {
+    setCarrito(carrito.filter(p => !(p.id === productoId && p.precioSeleccionado === precioSeleccionado)));
   };
 
-  const actualizarCantidad = (productoId, nuevaCantidad) => {
+  const actualizarCantidad = (productoId, precioSeleccionado, nuevaCantidad) => {
     if (nuevaCantidad < 1) {
-      quitarDelCarrito(productoId);
+      quitarDelCarrito(productoId, precioSeleccionado);
       return;
     }
     setCarrito(carrito.map(p => 
-      p.id === productoId ? { ...p, cantidad: nuevaCantidad } : p
+      p.id === productoId && p.precioSeleccionado === precioSeleccionado ? { ...p, cantidad: nuevaCantidad } : p
     ));
   };
 
-  const total = carrito.reduce((sum, p) => {
-    const precio = p.precioSeleccionado === 'tarjeta' ? p.precioTarjeta : p.precioEfectivo;
-    return sum + (precio * p.cantidad);
-  }, 0);
+  const toggleNotaCredito = (productoId, precioSeleccionado) => {
+    setCarrito(carrito.map(p => 
+      p.id === productoId && p.precioSeleccionado === precioSeleccionado ? { ...p, esNotaCredito: !p.esNotaCredito } : p
+    ));
+  };
 
   const handlePagoChange = (index, campo, valor) => {
     const nuevosPagos = [...pagosSeleccionados];
@@ -121,14 +148,58 @@ export const VentasPage = () => {
 
   const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
 
+  const imprimirTicketAFavor = () => {
+    const monto = Math.abs(diferencia);
+    const fecha = new Date().toLocaleString();
+    const ticket = `
+╔══════════════════════════════╗
+║     NOTA DE CRÉDITO A FAVOR   ║
+╠══════════════════════════════╣
+║ Fecha: ${fecha}
+║ Negocio: ${caja?.sucursal || 'N/A'}
+║
+║ MONTO A FAVOR: $${monto.toFixed(2)}
+║
+║ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+║ Este ticket acredita que el
+║ cliente tiene saldo a favor
+║ de $${monto.toFixed(2)}
+║
+║ Atendido por: ${user?.email || 'Usuario'}
+╚══════════════════════════════╝
+    `.trim();
+    
+    const printWindow = window.open('', '_blank', 'width=300,height=400');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Nota de Crédito</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 12px; white-space: pre; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>${ticket}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
   const realizarVenta = async () => {
     if (!caja) {
       setError('No hay caja abierta. Abrí la caja primero.');
       return;
     }
     if (carrito.length === 0) return;
-    if (totalPagos !== total) {
-      setError('El total de los pagos debe ser igual al total de la venta');
+    
+    if (diferencia > 0 && totalPagos !== diferencia) {
+      setError(`El total de los pagos debe ser igual a $${diferencia}`);
+      return;
+    }
+    if (diferencia <= 0 && totalPagos !== 0) {
+      setError('No hay monto a pagar. Los pagos deben ser $0');
       return;
     }
 
@@ -137,6 +208,13 @@ export const VentasPage = () => {
     try {
       // Crear la venta
       const ahora = new Date();
+      const tieneNotaCredito = carrito.some(p => p.esNotaCredito);
+      const tieneVentaNormal = carrito.some(p => !p.esNotaCredito);
+      
+      let tipoVenta = 'normal';
+      if (tieneNotaCredito && tieneVentaNormal) tipoVenta = 'mixta';
+      else if (tieneNotaCredito) tipoVenta = 'notaCredito';
+
       const productosVenta = carrito.map(item => {
         const precio = item.precioSeleccionado === 'tarjeta' ? item.precioTarjeta : item.precioEfectivo;
         return {
@@ -146,6 +224,7 @@ export const VentasPage = () => {
           cantidad: item.cantidad,
           precio,
           tipoPrecio: item.precioSeleccionado,
+          esNotaCredito: item.esNotaCredito || false,
         };
       });
 
@@ -153,6 +232,11 @@ export const VentasPage = () => {
         negocio: caja.sucursal,
         productos: productosVenta,
         total,
+        totalVenta,
+        totalNotaCredito,
+        diferencia,
+        tipoVenta,
+        observacion: observacion || null,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
         facturada: false,
         usuarioId: user.uid,
@@ -168,11 +252,15 @@ export const VentasPage = () => {
         const productoData = productoDoc.data();
         
         const stockActual = productoData.stockPorNegocio?.[caja.sucursal] || 0;
-        const nuevoStock = stockActual - item.cantidad;
+        const stockGlobalActual = productoData.stockGlobal || 0;
+        
+        const cambioStock = item.esNotaCredito ? item.cantidad : -item.cantidad;
+        const nuevoStock = stockActual + cambioStock;
+        const nuevoStockGlobal = stockGlobalActual + cambioStock;
         
         await updateDoc(productoRef, {
           [`stockPorNegocio.${caja.sucursal}`]: nuevoStock,
-          stockGlobal: (productoData.stockGlobal || 0) - item.cantidad,
+          stockGlobal: nuevoStockGlobal,
         });
       }
 
@@ -207,6 +295,7 @@ export const VentasPage = () => {
       
       setCarrito([]);
       setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
+      setObservacion('');
       alert('Venta realizada con éxito');
     } catch (err) {
       console.error(err);
@@ -336,45 +425,48 @@ export const VentasPage = () => {
             <p className="text-gray-500">El carrito está vacío</p>
           ) : (
             <div className="bg-white p-4 rounded-lg shadow mb-4">
-              {carrito.map(item => {
+              {carrito.map((item, index) => {
                 const precio = item.precioSeleccionado === 'tarjeta' ? item.precioTarjeta : item.precioEfectivo;
                 const cambiarTipoPrecio = (nuevoTipo) => {
-                  setCarrito(carrito.map(p => 
-                    p.id === item.id ? { ...p, precioSeleccionado: nuevoTipo } : p
+                  setCarrito(carrito.map((p, i) => 
+                    i === index ? { ...p, precioSeleccionado: nuevoTipo } : p
                   ));
                 };
+                const itemKey = `${item.id}-${item.precioSeleccionado}`;
                 return (
-                  <div key={item.id} className="py-2 border-b">
+                  <div key={itemKey} className={`py-2 border-b ${item.esNotaCredito ? 'bg-red-50 -mx-4 px-4' : ''}`}>
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-semibold text-sm">{item.nombre}</p>
+                        <p className={`font-semibold text-sm ${item.esNotaCredito ? 'text-red-700' : ''}`}>
+                          {item.esNotaCredito && '⚠️ '}{item.nombre}
+                        </p>
                         <p className="text-xs text-gray-500">
                           ${precio} x {item.cantidad}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => actualizarCantidad(item.id, item.cantidad - 1)}
+                          onClick={() => actualizarCantidad(item.id, item.precioSeleccionado, item.cantidad - 1)}
                           className="text-gray-500 hover:text-gray-700"
                         >
                           -
                         </button>
                         <span className="text-sm">{item.cantidad}</span>
                         <button
-                          onClick={() => actualizarCantidad(item.id, item.cantidad + 1)}
+                          onClick={() => actualizarCantidad(item.id, item.precioSeleccionado, item.cantidad + 1)}
                           className="text-gray-500 hover:text-gray-700"
                         >
                           +
                         </button>
                       </div>
                       <button
-                        onClick={() => quitarDelCarrito(item.id)}
+                        onClick={() => quitarDelCarrito(item.id, item.precioSeleccionado)}
                         className="text-red-600 hover:text-red-800 ml-2"
                       >
                         ✕
                       </button>
                     </div>
-                    <div className="mt-1">
+                    <div className="mt-1 flex items-center justify-between">
                       <select
                         value={item.precioSeleccionado}
                         onChange={(e) => cambiarTipoPrecio(e.target.value)}
@@ -383,14 +475,55 @@ export const VentasPage = () => {
                         <option value="efectivo">Efectivo: ${item.precioEfectivo}</option>
                         <option value="tarjeta">Tarjeta: ${item.precioTarjeta}</option>
                       </select>
+                      <button
+                        onClick={() => toggleNotaCredito(item.id, item.precioSeleccionado)}
+                        className={`text-xs px-2 py-0.5 rounded border ${item.esNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-gray-100 text-gray-600 border-gray-300'}`}
+                      >
+                        {item.esNotaCredito ? 'Nota Crédito' : 'Venta'}
+                      </button>
                     </div>
                   </div>
                 );
               })}
               
               <div className="mt-4 pt-4 border-t">
+                {totalNotaCredito > 0 && (
+                  <div className="text-sm mb-2">
+                    <p className="text-red-600">Nota Crédito: -${totalNotaCredito}</p>
+                    {diferencia < 0 && (
+                      <div className="flex items-center justify-between bg-green-50 p-2 rounded mt-1">
+                        <p className="text-green-700 font-semibold">A favor: $${Math.abs(diferencia)}</p>
+                        <button
+                          onClick={imprimirTicketAFavor}
+                          className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                        >
+                          🖨️ Imprimir Ticket
+                        </button>
+                      </div>
+                    )}
+                    {diferencia > 0 && (
+                      <p className="text-blue-600">El cliente debe pagar: ${diferencia}</p>
+                    )}
+                    {diferencia === 0 && (
+                      <p className="text-gray-600">Sin costo adicional</p>
+                    )}
+                  </div>
+                )}
                 <p className="text-xl font-bold">Total: ${total}</p>
               </div>
+              
+              {totalNotaCredito > 0 && (
+                <div className="mt-4">
+                  <label className="block text-sm font-semibold mb-1">Observación / Motivo</label>
+                  <textarea
+                    value={observacion}
+                    onChange={(e) => setObservacion(e.target.value)}
+                    placeholder="Ej: Error de precio, cliente devolvió producto..."
+                    className="w-full border p-2 rounded text-sm"
+                    rows={2}
+                  />
+                </div>
+              )}
             </div>
           )}
 
