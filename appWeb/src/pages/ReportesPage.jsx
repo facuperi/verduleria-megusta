@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { collection, getDocs, getDoc, updateDoc, doc } from "firebase/firestore";
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,13 +7,13 @@ import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
 const TIPOS_RETIRO = [
-  { id: 'cajaRoja', nombre: 'Caja roja' },
-  { id: 'gasto', nombre: 'Gasto' },
-  { id: 'retiroCaro', nombre: 'Retiro Caro' },
-  { id: 'retiroFede', nombre: 'Retiro Fede' },
-  { id: 'errorMP', nombre: 'Error MP' },
-  { id: 'errorDNI', nombre: 'Error DNI' },
-  { id: 'errorTJ', nombre: 'Error TJ' },
+  { id: 'cajaRoja', nombre: 'Caja roja', icono: '💰' },
+  { id: 'gasto', nombre: 'Gasto', icono: '🧹' },
+  { id: 'retiroCaro', nombre: 'Retiro Caro', icono: '👔' },
+  { id: 'retiroFede', nombre: 'Retiro Fede', icono: '👔' },
+  { id: 'errorMP', nombre: 'Error MP', icono: '⚠️' },
+  { id: 'errorDNI', nombre: 'Error DNI', icono: '⚠️' },
+  { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
 ];
 
 const TIPOS_MOVIMIENTO = [
@@ -55,6 +56,7 @@ export const ReportesPage = () => {
   const [filasExpandidas, setFilasExpandidas] = useState({});
   const [retirosPendientes, setRetirosPendientes] = useState(0);
   const [migrando, setMigrando] = useState(false);
+  const [tiposRetiroPersonalizados, setTiposRetiroPersonalizados] = useState({});
 
   const restriction = checkDeviceRestriction('reportes');
   const canAccess = !isMobile && isGerente;
@@ -181,6 +183,14 @@ export const ReportesPage = () => {
 
       setMovimientos(todos);
       
+      // Cargar tipos de retiros personalizados
+      const tiposSnapshot = await getDocs(collection(db, 'tiposRetiro'));
+      const tiposObj = {};
+      tiposSnapshot.docs.forEach(doc => {
+        tiposObj[doc.id] = { nombre: doc.data().nombre, icono: doc.data().icono };
+      });
+      setTiposRetiroPersonalizados(tiposObj);
+      
       // Aplicar filtros automáticamente después de cargar
       aplicarFiltros(todos);
     } catch (err) {
@@ -248,11 +258,21 @@ export const ReportesPage = () => {
     }));
   };
 
-  // ==== PASO 7: Exportar a CSV ====
-  const exportarCSV = () => {
-    const headers = ['Fecha', 'Hora', 'Tipo', 'Negocio', 'Detalle', 'Monto', 'Método', 'Usuario', 'Observación'];
-    
-    const rows = movimientosFiltrados.map(m => {
+  // ==== Exportar a Excel ====
+  const exportarExcel = async () => {
+    // Cargar tipos de retiro personalizados
+    const TIPOS_FIJOS = ['cajaRoja', 'gasto', 'retiroCaro', 'retiroFede', 'errorMP', 'errorDNI', 'errorTJ'];
+    const tiposPersonalizados = {};
+    try {
+      const tiposSnapshot = await getDocs(collection(db, 'tiposRetiro'));
+      tiposSnapshot.docs.forEach(doc => {
+        tiposPersonalizados[doc.id] = doc.data().nombre;
+      });
+    } catch (e) {
+      console.log('No se pudieron cargar tipos de retiro personalizados');
+    }
+
+    const datos = movimientosFiltrados.map(m => {
       let tipo = '';
       let detalle = '';
       let monto = 0;
@@ -260,10 +280,20 @@ export const ReportesPage = () => {
       if (m.origen === 'ventas') {
         const esNotaCredito = m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
         tipo = esNotaCredito ? 'Nota Crédito' : 'Venta';
-        detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(' | ');
+        detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(', ');
         monto = m.diferencia > 0 ? m.diferencia : m.total;
       } else if (m.origen === 'retiros') {
-        tipo = `Retiro: ${m.tipo}`;
+        // Determinar nombre del tipo: si es fijo usar mapeo, si es personalizado buscar en Firestore
+        let nombreTipo = m.tipo;
+        if (!TIPOS_FIJOS.includes(m.tipo)) {
+          // Es un tipo personalizado, buscar nombre
+          nombreTipo = tiposPersonalizados[m.tipo] || m.tipo;
+        }
+        // Formatear nombre: "retiroCaro" -> "Retiro Caro"
+        const tipoFormateado = nombreTipo
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase());
+        tipo = tipoFormateado;
         detalle = m.observacion || '-';
         monto = -m.monto;
       } else {
@@ -274,32 +304,40 @@ export const ReportesPage = () => {
       
       const fecha = m.fecha?.toDate ? m.fecha.toDate() : new Date(m.fecha || m.hora);
       
-      return [
-        fecha.toLocaleDateString('es-AR'),
-        fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-        tipo,
-        m.negocio || m.sucursal || '-',
-        detalle,
-        monto,
-        m.tipoPago?.join(', ') || '-',
-        m.usuarioNombre || '-',
-        m.observacion || '-'
-      ];
+      return {
+        Fecha: fecha.toLocaleDateString('es-AR'),
+        Hora: fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+        Tipo: tipo,
+        Negocio: (m.negocio || m.sucursal || '-').charAt(0).toUpperCase() + (m.negocio || m.sucursal || '-').slice(1),
+        Detalle: detalle,
+        Monto: monto,
+        'Método de Pago': m.tipoPago?.join(', ') || '-',
+        Usuario: m.usuarioNombre || '-'
+      };
     });
 
-    // Crear CSV con BOM para que funcione bien con caracteres especiales
-    // Usar punto y coma como separador para Excel argentino
-    const BOM = '\uFEFF';
-    const csvContent = BOM + [headers, ...rows].map(row => 
-      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';')
-    ).join('\n');
+    // Crear workbook y escribir
+    const ws = XLSX.utils.json_to_sheet(datos);
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `reporte_${fechaDesde}_${fechaHasta}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    // Ajustar ancho de columnas
+    const colWidths = [
+      { wch: 12 }, // Fecha
+      { wch: 10 }, // Hora
+      { wch: 18 }, // Tipo
+      { wch: 12 }, // Negocio
+      { wch: 45 }, // Detalle
+      { wch: 12 }, // Monto
+      { wch: 15 }, // Método
+      { wch: 25 }, // Usuario
+    ];
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Reportes');
+    
+    // Descargar archivo
+    const nombreArchivo = `reporte_${fechaDesde}_${fechaHasta}.xlsx`;
+    XLSX.writeFile(wb, nombreArchivo);
   };
 
   if (!canAccess) {
@@ -417,10 +455,10 @@ export const ReportesPage = () => {
           </button>
           {movimientosFiltrados.length > 0 && (
             <button
-              onClick={exportarCSV}
+              onClick={exportarExcel}
               className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
             >
-              📥 Exportar CSV
+              📊 Exportar Excel
             </button>
           )}
         </div>
@@ -481,7 +519,22 @@ export const ReportesPage = () => {
                     monto = m.diferencia > 0 ? m.diferencia : m.total;
                     colorFila = esNotaCredito ? 'bg-red-50' : 'bg-green-50';
                   } else if (m.origen === 'retiros') {
-                    tipo = `Retiro: ${m.tipo}`;
+                    // Buscar nombre e icono del tipo de retiro
+                    const tipoFijo = TIPOS_RETIRO.find(t => t.id === m.tipo);
+                    const tipoPersonalizado = tiposRetiroPersonalizados[m.tipo];
+                    let nombreTipo = '';
+                    let iconoRetiro = '💸';
+                    if (tipoFijo) {
+                      nombreTipo = tipoFijo.nombre;
+                      iconoRetiro = tipoFijo.icono;
+                    } else if (tipoPersonalizado) {
+                      nombreTipo = tipoPersonalizado.nombre;
+                      iconoRetiro = tipoPersonalizado.icono || '💸';
+                    } else {
+                      // Fallback si no se encuentra
+                      nombreTipo = m.tipo.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                    }
+                    tipo = `${iconoRetiro} ${nombreTipo}`;
                     detalle = m.observacion || '-';
                     monto = -m.monto;
                     colorFila = 'bg-orange-50';
