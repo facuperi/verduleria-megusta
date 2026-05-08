@@ -8,6 +8,7 @@ import { Layout } from '../components/Layout';
 const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
+  { id: 'debito', nombre: 'Débito' },
   { id: 'mercadopago', nombre: 'MercadoPago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
@@ -23,6 +24,7 @@ export const VentasPage = () => {
   const [busqueda, setBusqueda] = useState('');
   const [caja, setCaja] = useState(null);
   const [observacion, setObservacion] = useState('');
+  const [ventaExitosa, setVentaExitosa] = useState(null);
   
   // Métodos de pago seleccionados
   const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0 }]);
@@ -107,10 +109,12 @@ export const VentasPage = () => {
       setCarrito([...carrito, { ...producto, cantidad: 1, precioSeleccionado: tipoPrecio, esNotaCredito: false }]);
     }
     setBusqueda('');
+    setVentaExitosa(null);
   };
 
   const quitarDelCarrito = (productoId, precioSeleccionado) => {
     setCarrito(carrito.filter(p => !(p.id === productoId && p.precioSeleccionado === precioSeleccionado)));
+    setVentaExitosa(null);
   };
 
   const actualizarCantidad = (productoId, precioSeleccionado, nuevaCantidad) => {
@@ -184,6 +188,83 @@ export const VentasPage = () => {
     `);
     printWindow.document.close();
     printWindow.focus();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
+  const imprimirTicketVenta = () => {
+    if (!ventaExitosa || !caja) return;
+    
+    const fecha = new Date().toLocaleString('es-AR');
+    const negocioNombre = caja.sucursal === 'chiclana' ? 'Chiclana' : caja.sucursal === 'belgrano' ? 'Belgrano' : caja.sucursal;
+    
+    let ticket = `╔══════════════════════════════╗
+║       ${negocioNombre.toUpperCase().padEnd(17)}║
+╠══════════════════════════════╣
+║ Fecha: ${fecha}
+║ Venta #: ${ventaExitosa.id.slice(-6).toUpperCase()}
+╠══════════════════════════════╣
+║ PRODUCTO        CANT    IMPORTE║
+║ ──────────────────────────────`;
+    
+    const ventasNormales = ventaExitosa.productos.filter(p => !p.esNotaCredito);
+    const notasCredito = ventaExitosa.productos.filter(p => p.esNotaCredito);
+    
+    for (const item of ventasNormales) {
+      const nombre = item.nombre.length > 14 ? item.nombre.substring(0, 12) + '..' : item.nombre.padEnd(14);
+      const importe = (item.precio * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 0 });
+      ticket += `
+║ ${nombre} ${item.cantidad}x  $${importe}`;
+    }
+    
+    if (ventasNormales.length > 0) {
+      ticket += `
+║ ──────────────────────────────`;
+    }
+    
+    if (notasCredito.length > 0) {
+      ticket += `
+║ NOTA CRÉDITO:`;
+      for (const item of notasCredito) {
+        const nombre = item.nombre.length > 14 ? item.nombre.substring(0, 12) + '..' : item.nombre.padEnd(14);
+        const importe = (item.precio * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 0 });
+        ticket += `
+║ ${nombre} ${item.cantidad}x -$${importe}`;
+      }
+    }
+    
+    const total = ventaExitosa.total.toLocaleString('es-AR', { minimumFractionDigits: 0 });
+    
+    ticket += `
+╠══════════════════════════════╣
+║            TOTAL: $${total}
+║ ──────────────────────────────`;
+    
+    const metodosPago = ventaExitosa.tipoPago.map(p => {
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', Cuentadni: 'Cuenta DNI' };
+      return nombres[p.metodo] || p.metodo;
+    }).join(', ');
+    
+    ticket += `
+║ PAGO: ${metodosPago}
+╠══════════════════════════════╣
+║    Gracias por su compra!     ║
+║     Vuelve pronto :)          ║
+╚══════════════════════════════╝`;
+    
+    const printWindow = window.open('', '_blank', 'width=300,height=500');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Ticket de Venta</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>${ticket}</body>
+      </html>
+    `);
+    printWindow.document.close();
     setTimeout(() => printWindow.print(), 250);
   };
 
@@ -273,6 +354,7 @@ export const VentasPage = () => {
           const campoKey = {
             'efectivo': 'ventasEfectivo',
             'tarjeta': 'ventasTarjeta',
+            'debito': 'ventasDebito',
             'mercadopago': 'ventasMercadoPago',
             'cuentadni': 'ventasCuentaDNI',
           }[pago.metodo];
@@ -296,6 +378,14 @@ export const VentasPage = () => {
       setCarrito([]);
       setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
       setObservacion('');
+      setVentaExitosa({
+        id: ventaDoc.id,
+        total,
+        productos: productosVenta,
+        tipoPago: pagosSeleccionados,
+        tipoVenta,
+        negocio: caja.sucursal,
+      });
       alert('Venta realizada con éxito');
     } catch (err) {
       console.error(err);
@@ -583,6 +673,22 @@ export const VentasPage = () => {
               >
                 {vendiendo ? 'Procesando...' : 'Vender'}
               </button>
+            </div>
+          )}
+
+          {ventaExitosa && (
+            <div className="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">
+                  ✅ Venta #{ventaExitosa.id.slice(-6).toUpperCase()} - Total: <span className="font-bold">${ventaExitosa.total.toLocaleString('es-AR')}</span>
+                </span>
+                <button 
+                  onClick={imprimirTicketVenta} 
+                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                >
+                  🖨️ Imprimir Ticket
+                </button>
+              </div>
             </div>
           )}
         </div>

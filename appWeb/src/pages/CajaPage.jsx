@@ -116,6 +116,7 @@ export const CajaPage = () => {
         hora: ahora.toISOString(),
         ventasEfectivo: 0,
         ventasTarjeta: 0,
+        ventasDebito: 0,
         ventasMercadoPago: 0,
         ventasCuentaDNI: 0,
       });
@@ -150,6 +151,10 @@ export const CajaPage = () => {
       .filter(v => v.tipoPago?.includes('tarjeta'))
       .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
     
+    const ventasDebito = ventasNormales
+      .filter(v => v.tipoPago?.includes('debito'))
+      .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+    
     const ventasMercadoPago = ventasNormales
       .filter(v => v.tipoPago?.includes('mercadopago'))
       .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
@@ -164,13 +169,14 @@ export const CajaPage = () => {
     const ventasBrutas = montoVentasNormales;
     const notaCreditoTotal = montoNotasCredito;
     const ventaNeta = ventasBrutas - notaCreditoTotal;
-    const efectivoCaja = ventasEfectivo - totalRetiros;
-    const saldoSistema = (caja?.saldoApertura || 0) + efectivoCaja;
+    const efectivoCaja = (caja?.saldoApertura || 0) + ventasEfectivo - totalRetiros;
+    const saldoSistema = efectivoCaja;
     const diferencia = (parseFloat(saldoCierre) || 0) - saldoSistema;
 
     return { 
       ventasEfectivo, 
       ventasTarjeta, 
+      ventasDebito,
       ventasMercadoPago, 
       ventasCuentaDNI, 
       ventasBrutas,
@@ -189,13 +195,13 @@ export const CajaPage = () => {
     setProcesando(true);
     try {
       const ahora = new Date();
-      const { ventasEfectivo, ventasTarjeta, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia } = calcularVentas();
+      const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia } = calcularVentas();
       
       await updateDoc(doc(db, 'caja', caja.id), {
         estado: 'cerrada',
         ventasEfectivo,
         ventasTarjeta,
-        ventasMercadoPago,
+        ventasDebito,
         ventasMercadoPago,
         ventasCuentaDNI,
         ventasBrutas,
@@ -248,6 +254,7 @@ export const CajaPage = () => {
         monto: monto,
         observacion: observacionRetiro || '',
         cajaId: caja.id,
+        negocio: caja.sucursal,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
         fecha: ahora.toISOString(),
@@ -338,6 +345,7 @@ export const CajaPage = () => {
 ║ POR MÉTODO DE PAGO:
 ║ Efectivo:         $${ventasEfectivo.toLocaleString('es-AR')}
 ║ Tarjeta:          $${ventasTarjeta.toLocaleString('es-AR')}
+║ Débito:           $${ventasDebito.toLocaleString('es-AR')}
 ║ MercadoPago:      $${ventasMercadoPago.toLocaleString('es-AR')}
 ║ Cuenta DNI:       $${ventasCuentaDNI.toLocaleString('es-AR')}
 ║
@@ -380,7 +388,7 @@ export const CajaPage = () => {
     );
   }
 
-  const { ventasEfectivo, ventasTarjeta, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, montoVentasNormales, montoNotasCredito } = calcularVentas();
+  const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, montoVentasNormales, montoNotasCredito } = calcularVentas();
 
   return (
     <Layout>
@@ -465,6 +473,7 @@ export const CajaPage = () => {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <p>Efectivo: <span className="font-semibold">${ventasEfectivo}</span></p>
                   <p>Tarjeta: <span className="font-semibold">${ventasTarjeta}</span></p>
+                  <p>Débito: <span className="font-semibold">${ventasDebito}</span></p>
                   <p>MercadoPago: <span className="font-semibold">${ventasMercadoPago}</span></p>
                   <p>Cuenta DNI: <span className="font-semibold">${ventasCuentaDNI}</span></p>
                 </div>
@@ -594,7 +603,7 @@ export const CajaPage = () => {
                               </td>
                               <td className="py-2 capitalize text-gray-600">
                                 {item.tipoPago?.map(p => {
-                                  const nombres = { efectivo: 'EF', tarjeta: 'TJ', mercadopago: 'MP',cuentadni: 'DNI' };
+                                  const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP',cuentadni: 'DNI' };
                                   return nombres[p] || p;
                                 }).join(', ') || '-'}
                               </td>
