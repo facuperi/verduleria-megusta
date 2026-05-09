@@ -191,53 +191,55 @@ export const VentasPage = () => {
     setTimeout(() => printWindow.print(), 250);
   };
 
-  const imprimirTicketVenta = () => {
+const imprimirTicketVenta = () => {
     if (!ventaExitosa || !caja) return;
     
     const fecha = new Date().toLocaleString('es-AR');
-    const negocioNombre = caja.sucursal === 'chiclana' ? 'Chiclana' : caja.sucursal === 'belgrano' ? 'Belgrano' : caja.sucursal;
+    const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
+    const ventaId = ventaExitosa.id.slice(-6).toUpperCase();
     
-    let ticket = `╔══════════════════════════════╗
-║       ${negocioNombre.toUpperCase().padEnd(17)}║
-╠══════════════════════════════╣
-║ Fecha: ${fecha}
-║ Venta #: ${ventaExitosa.id.slice(-6).toUpperCase()}
-╠══════════════════════════════╣
-║ PRODUCTO        CANT    IMPORTE║
-║ ──────────────────────────────`;
+    let ticket = `====================================
+      SANTOS Y SANTAS
+    ${direccion}
+    Tel: 2915245537
+====================================
+${fecha}    Vta: ${ventaId}
+───────────────────────────────────
+PRODUCTO              CANT    IMP
+───────────────────────────────────`;
     
     const ventasNormales = ventaExitosa.productos.filter(p => !p.esNotaCredito);
     const notasCredito = ventaExitosa.productos.filter(p => p.esNotaCredito);
     
     for (const item of ventasNormales) {
-      const nombre = item.nombre.length > 14 ? item.nombre.substring(0, 12) + '..' : item.nombre.padEnd(14);
+      const nombre = item.nombre.length > 18 ? item.nombre.substring(0, 16) + '..' : item.nombre.padEnd(18);
       const importe = (item.precio * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 0 });
       ticket += `
-║ ${nombre} ${item.cantidad}x  $${importe}`;
+${nombre} ${item.cantidad.toString().padStart(3)}  ${importe.padStart(5)}`;
     }
     
     if (ventasNormales.length > 0) {
       ticket += `
-║ ──────────────────────────────`;
+───────────────────────────────────`;
     }
     
     if (notasCredito.length > 0) {
       ticket += `
-║ NOTA CRÉDITO:`;
+NOTA CRÉDITO:`;
       for (const item of notasCredito) {
-        const nombre = item.nombre.length > 14 ? item.nombre.substring(0, 12) + '..' : item.nombre.padEnd(14);
+        const nombre = item.nombre.length > 18 ? item.nombre.substring(0, 16) + '..' : item.nombre.padEnd(18);
         const importe = (item.precio * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 0 });
         ticket += `
-║ ${nombre} ${item.cantidad}x -$${importe}`;
+${nombre} ${item.cantidad.toString().padStart(3)} -${importe.padStart(5)}`;
       }
     }
     
     const total = ventaExitosa.total.toLocaleString('es-AR', { minimumFractionDigits: 0 });
     
     ticket += `
-╠══════════════════════════════╣
-║            TOTAL: $${total}
-║ ──────────────────────────────`;
+───────────────────────────────────
+TOTAL:                     $${total}
+───────────────────────────────────`;
     
     const metodosPago = ventaExitosa.tipoPago.map(p => {
       const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', Cuentadni: 'Cuenta DNI' };
@@ -245,19 +247,19 @@ export const VentasPage = () => {
     }).join(', ');
     
     ticket += `
-║ PAGO: ${metodosPago}
-╠══════════════════════════════╣
-║    Gracias por su compra!     ║
-║     Vuelve pronto :)          ║
-╚══════════════════════════════╝`;
+PAGO: ${metodosPago}
+====================================
+     Gracias por su compra!
+        Vuelve pronto :)
+====================================`;
     
-    const printWindow = window.open('', '_blank', 'width=300,height=500');
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
     printWindow.document.write(`
       <html>
         <head>
           <title>Ticket de Venta</title>
           <style>
-            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; }
+            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
             @media print { body { margin: 0; } }
           </style>
         </head>

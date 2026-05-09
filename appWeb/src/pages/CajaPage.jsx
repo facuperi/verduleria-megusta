@@ -29,6 +29,9 @@ export const CajaPage = () => {
   const [loading, setLoading] = useState(true);
   const [procesando, setProcesando] = useState(false);
   
+  // Modal de cierre de caja
+  const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
+
   // Modal de retiro
   const [mostrarModalRetiro, setMostrarModalRetiro] = useState(false);
   const [tipoRetiro, setTipoRetiro] = useState('');
@@ -191,7 +194,7 @@ export const CajaPage = () => {
     };
   };
 
-  const cerrarCaja = async () => {
+  const cerrarCaja = async (imprimir = false) => {
     setProcesando(true);
     try {
       const ahora = new Date();
@@ -216,10 +219,14 @@ export const CajaPage = () => {
         horaCierre: ahora.toISOString(),
       });
       
-      alert('Caja cerrada con éxito');
       setCaja(null);
       setSaldoCierre('');
       setVentasHoy([]);
+      setMostrarModalCierre(false);
+      
+      if (imprimir) {
+        setTimeout(() => imprimirTicketCierre(), 300);
+      }
     } catch (err) {
       console.error(err);
       alert('Error al cerrar caja');
@@ -328,42 +335,59 @@ export const CajaPage = () => {
     if (!caja) return;
     
     const fecha = new Date().toLocaleString();
-    const ticket = `
-╔══════════════════════════════╗
-║       CIERRE DE CAJA         ║
-╠══════════════════════════════╣
-║ Fecha: ${fecha}
-║ Negocio: ${caja.sucursal}
-║
-║ ─────────────────────────────
-║ RESUMEN:
-║ Ventas Brutas:    $${ventasBrutas.toLocaleString('es-AR')}
-║ Notas Crédito:    -$${notaCreditoTotal.toLocaleString('es-AR')}
-║ Venta Neta:       $${ventaNeta.toLocaleString('es-AR')}
-║ ─────────────────────────────
-║
-║ POR MÉTODO DE PAGO:
-║ Efectivo:         $${ventasEfectivo.toLocaleString('es-AR')}
-║ Tarjeta:          $${ventasTarjeta.toLocaleString('es-AR')}
-║ Débito:           $${ventasDebito.toLocaleString('es-AR')}
-║ MercadoPago:      $${ventasMercadoPago.toLocaleString('es-AR')}
-║ Cuenta DNI:       $${ventasCuentaDNI.toLocaleString('es-AR')}
-║
-║ ─────────────────────────────
-║ Efectivo en Caja: $${efectivoCaja.toLocaleString('es-AR')}
-║ Saldo Apertura:   $${caja.saldoApertura.toLocaleString('es-AR')}
-║ Saldo Sistema:    $${saldoSistema.toLocaleString('es-AR')}
-║
-║ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    `.trim();
+    const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
+    const sucursalNombre = caja.sucursal === 'chiclana' ? 'CHICLANA' : caja.sucursal === 'belgrano' ? 'BELGRANO' : caja.sucursal.toUpperCase();
     
-    const printWindow = window.open('', '_blank', 'width=300,height=500');
+    const formatMonto = (monto) => monto.toLocaleString('es-AR').padStart(8);
+    
+    let ticket = `====================================
+      SANTOS Y SANTAS
+    ${direccion}
+    Tel: 2915245537
+====================================
+     CIERRE DE CAJA
+${fecha}    ${sucursalNombre}
+───────────────────────────────────
+RESUMEN:
+Ventas Brutas:   $${formatMonto(ventasBrutas)}
+Notas Crédito:   -$${formatMonto(notaCreditoTotal)}
+VENTA NETA:      $${formatMonto(ventaNeta)}
+───────────────────────────────────
+X METODO DE PAGO:
+Efectivo:       $${formatMonto(ventasEfectivo)}
+Tarjeta:        $${formatMonto(ventasTarjeta)}
+Debito:         $${formatMonto(ventasDebito)}
+MercadoPago:    $${formatMonto(ventasMercadoPago)}
+Cuenta DNI:     $${formatMonto(ventasCuentaDNI)}
+───────────────────────────────────
+EFECTIVO CAJA:  $${formatMonto(efectivoCaja)}
+SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
+SALDO SISTEMA:  $${formatMonto(saldoSistema)}
+───────────────────────────────────
+DIFERENCIA:    $${formatMonto(diferencia)}
+====================================
+FIRMA CAJERO:
+
+
+
+
+
+───────────────────────────────────
+OBSERVACIONES:
+
+
+
+
+
+====================================`;
+    
+    const printWindow = window.open('', '_blank', 'width=300,height=700');
     printWindow.document.write(`
       <html>
         <head>
           <title>Cierre de Caja</title>
           <style>
-            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; }
+            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
             @media print { body { margin: 0; } }
           </style>
         </head>
@@ -492,12 +516,6 @@ export const CajaPage = () => {
                   >
                     💸 Nuevo Retiro
                   </button>
-                  <button
-                    onClick={imprimirTicketCierre}
-                    className="text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300"
-                  >
-                    🖨️
-                  </button>
                 </div>
               </div>
               
@@ -520,7 +538,7 @@ export const CajaPage = () => {
               )}
 
               <button
-                onClick={cerrarCaja}
+                onClick={() => setMostrarModalCierre(true)}
                 disabled={procesando || !saldoCierre}
                 className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 disabled:opacity-50"
               >
@@ -768,6 +786,90 @@ export const CajaPage = () => {
               >
                 Cancelar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarModalCierre && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-center">
+              <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
+                🖨️ Cerrar Caja
+              </h2>
+            </div>
+            
+            <div className="p-5">
+              <div className="bg-gray-50 rounded-lg p-4 mb-5">
+                <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  📊 Resumen del Día
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Ventas Brutas:</span>
+                    <span className="font-medium">${ventasBrutas.toLocaleString('es-AR')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Notas Crédito:</span>
+                    <span className="font-medium text-red-600">-${notaCreditoTotal.toLocaleString('es-AR')}</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                    <span>💰 VENTA NETA:</span>
+                    <span className="text-green-600">${ventaNeta.toLocaleString('es-AR')}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 rounded-lg p-4 mb-5">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Efectivo en Caja:</span>
+                    <span className="font-medium">${efectivoCaja.toLocaleString('es-AR')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Saldo Sistema:</span>
+                    <span className="font-medium">${saldoSistema.toLocaleString('es-AR')}</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                    <span>Diferencia:</span>
+                    <span className={diferencia === 0 ? 'text-green-600' : 'text-red-600'}>
+                      ${diferencia.toLocaleString('es-AR')}
+                    </span>
+                  </div>
+                </div>
+                
+                {diferencia !== 0 && (
+                  <div className="mt-3 p-2 bg-red-100 text-red-700 text-xs rounded flex items-center gap-1">
+                    ⚠️ La diferencia no coincide con el saldo del sistema
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => cerrarCaja(true)}
+                  disabled={procesando}
+                  className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  🖨️ Cerrar Caja e Imprimir
+                </button>
+                
+                <button
+                  onClick={() => cerrarCaja(false)}
+                  disabled={procesando}
+                  className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  ❌ Cerrar sin Imprimir
+                </button>
+                
+                <button
+                  onClick={() => setMostrarModalCierre(false)}
+                  className="w-full border border-gray-300 text-gray-600 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </div>
