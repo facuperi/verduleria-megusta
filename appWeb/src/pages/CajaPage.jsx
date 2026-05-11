@@ -373,11 +373,11 @@ ${fechaCierre}    ${sucursalNombre}
  Caja Roja:      $${formatMonto(gastosCajaRoja)}
  Otros Gastos:    $${formatMonto(gastosOtros)}
 ───────────────────────────────────
- SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
- EFECTIVO CAJA:  $${formatMonto(efectivoCaja)}
- SALDO SISTEMA:  $${formatMonto(saldoSistema)}
+  SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
+  SALDO CIERRE:   $${formatMonto(parseFloat(saldoCierre) || 0)}
+  SALDO SISTEMA:  $${formatMonto(saldoSistema)}
 ───────────────────────────────────
- DIFERENCIA:     $${formatMonto(diferencia)}
+  DIFERENCIA:     $${formatMonto(diferencia)}
 ===================================
  FIRMA CAJERO:
 
