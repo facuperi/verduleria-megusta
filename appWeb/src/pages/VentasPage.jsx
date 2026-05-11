@@ -191,7 +191,7 @@ export const VentasPage = () => {
     setTimeout(() => printWindow.print(), 250);
   };
 
-const imprimirTicketVenta = () => {
+  const imprimirTicketVenta = () => {
     if (!ventaExitosa || !caja) return;
     
     const fecha = new Date().toLocaleString('es-AR');
