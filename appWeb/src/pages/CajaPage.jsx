@@ -331,56 +331,64 @@ export const CajaPage = () => {
     }
   };
 
-  const imprimirTicketCierre = () => {
+const imprimirTicketCierre = () => {
     if (!caja) return;
-    
-    const fecha = new Date().toLocaleString();
+
+    const ahora = new Date();
+    const fechaCierre = ahora.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+    const fechaApertura = caja.fecha ? new Date(caja.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
     const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
     const sucursalNombre = caja.sucursal === 'chiclana' ? 'CHICLANA' : caja.sucursal === 'belgrano' ? 'BELGRANO' : caja.sucursal.toUpperCase();
-    
+
     const formatMonto = (monto) => monto.toLocaleString('es-AR').padStart(8);
-    
+
+    const gastosCajaRoja = retiros.filter(r => r.tipo === 'cajaRoja').reduce((sum, r) => sum + r.monto, 0);
+    const gastosOtros = retiros.filter(r => r.tipo !== 'cajaRoja').reduce((sum, r) => sum + r.monto, 0);
+    const totalGastos = gastosCajaRoja + gastosOtros;
+
     let ticket = `====================================
       SANTOS Y SANTAS
     ${direccion}
     Tel: 2915245537
-====================================
+===================================
      CIERRE DE CAJA
-${fecha}    ${sucursalNombre}
+${fechaCierre}    ${sucursalNombre}
 ───────────────────────────────────
-RESUMEN:
-Ventas Brutas:   $${formatMonto(ventasBrutas)}
-Notas Crédito:   -$${formatMonto(notaCreditoTotal)}
-VENTA NETA:      $${formatMonto(ventaNeta)}
+ APERTURA: ${fechaApertura}
+ CIERRE:   ${fechaCierre}
 ───────────────────────────────────
-X METODO DE PAGO:
-Efectivo:       $${formatMonto(ventasEfectivo)}
-Tarjeta:        $${formatMonto(ventasTarjeta)}
-Debito:         $${formatMonto(ventasDebito)}
-MercadoPago:    $${formatMonto(ventasMercadoPago)}
-Cuenta DNI:     $${formatMonto(ventasCuentaDNI)}
+ RESUMEN:
+ Ventas Brutas:   $${formatMonto(ventasBrutas)}
+ Notas Credito:   -$${formatMonto(notaCreditoTotal)}
+ VENTA NETA:      $${formatMonto(ventaNeta)}
 ───────────────────────────────────
-EFECTIVO CAJA:  $${formatMonto(efectivoCaja)}
-SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
-SALDO SISTEMA:  $${formatMonto(saldoSistema)}
+ X METODO DE PAGO:
+ Efectivo:       $${formatMonto(ventasEfectivo)}
+ Tarjeta:        $${formatMonto(ventasTarjeta)}
+ Debito:         $${formatMonto(ventasDebito)}
+ MercadoPago:    $${formatMonto(ventasMercadoPago)}
+ Cuenta DNI:     $${formatMonto(ventasCuentaDNI)}
 ───────────────────────────────────
-DIFERENCIA:    $${formatMonto(diferencia)}
-====================================
-FIRMA CAJERO:
-
-
-
+ GASTOS:
+ Caja Roja:      $${formatMonto(gastosCajaRoja)}
+ Otros Gastos:    $${formatMonto(gastosOtros)}
+───────────────────────────────────
+ SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
+ EFECTIVO CAJA:  $${formatMonto(efectivoCaja)}
+ SALDO SISTEMA:  $${formatMonto(saldoSistema)}
+───────────────────────────────────
+ DIFERENCIA:     $${formatMonto(diferencia)}
+===================================
+ FIRMA CAJERO:
 
 
 ───────────────────────────────────
-OBSERVACIONES:
+ OBSERVACIONES: 
 
 
 
+===================================`;
 
-
-====================================`;
-    
     const printWindow = window.open('', '_blank', 'width=300,height=700');
     printWindow.document.write(`
       <html>

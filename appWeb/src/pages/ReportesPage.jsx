@@ -57,6 +57,10 @@ export const ReportesPage = () => {
   const [retirosPendientes, setRetirosPendientes] = useState(0);
   const [migrando, setMigrando] = useState(false);
   const [tiposRetiroPersonalizados, setTiposRetiroPersonalizados] = useState({});
+  const [productos, setProductos] = useState([]);
+  const [productosSeleccionados, setProductosSeleccionados] = useState([]);
+  const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [mostrarSelectorProductos, setMostrarSelectorProductos] = useState(false);
 
   const restriction = checkDeviceRestriction('reportes');
   const canAccess = !isMobile && isGerente;
@@ -110,6 +114,9 @@ export const ReportesPage = () => {
       const retiros = retirosSnapshot.docs.map(doc => doc.data());
       const sinNegocio = retiros.filter(r => !r.negocio).length;
       setRetirosPendientes(sinNegocio);
+
+      const productosSnapshot = await getDocs(collection(db, 'productos'));
+      setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     };
     if (canAccess) {
       verificarRetiros();
@@ -207,6 +214,21 @@ export const ReportesPage = () => {
     // Se aplica en el render
   };
 
+  const toggleProducto = (productoId) => {
+    setProductosSeleccionados(prev => {
+      if (prev.includes(productoId)) {
+        return prev.filter(id => id !== productoId);
+      } else {
+        return [...prev, productoId];
+      }
+    });
+  };
+
+  const limpiarProductos = () => {
+    setProductosSeleccionados([]);
+    setBusquedaProducto('');
+  };
+
   const movimientosFiltrados = movimientos
     .filter(m => {
       // Filtro por negocio
@@ -233,6 +255,12 @@ export const ReportesPage = () => {
       if (tipoMovimiento !== 'ventas' && tipoMovimiento !== 'todos') return true;
       if (metodoPago === 'todos') return true;
       return m.tipoPago?.includes(metodoPago);
+    })
+    .filter(m => {
+      // Filtro por productos seleccionados
+      if (tipoMovimiento !== 'ventas' || productosSeleccionados.length === 0) return true;
+      const productosVenta = m.productos?.map(p => p.productoId || p.id) || [];
+      return productosVenta.some(pid => productosSeleccionados.includes(pid));
     });
 
   // ==== PASO 4: Calcular resumen ====
@@ -441,6 +469,101 @@ export const ReportesPage = () => {
                   <option key={m.id} value={m.id}>{m.nombre}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Filtro secundario: Productos (solo para ventas) */}
+          {tipoMovimiento === 'ventas' && (
+            <div className="md:col-span-2 relative">
+              <label className="block text-sm font-semibold mb-1">
+                Productos {productosSeleccionados.length > 0 && `(${productosSeleccionados.length} seleccionados)`}
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={busquedaProducto}
+                    onChange={(e) => setBusquedaProducto(e.target.value)}
+                    onFocus={() => setMostrarSelectorProductos(true)}
+                    placeholder={productosSeleccionados.length > 0 ? `${productosSeleccionados.length} productos seleccionados` : "Buscar por código o nombre..."}
+                    className="w-full border p-2 rounded"
+                  />
+                  {mostrarSelectorProductos && (
+                    <div className="absolute z-10 mt-1 bg-white border rounded shadow-lg max-h-64 overflow-y-auto w-full left-0">
+                      <div className="p-2 bg-gray-100 sticky top-0 flex justify-between items-center">
+                        <span className="text-xs text-gray-600">Productos disponibles</span>
+                        <button
+                          onClick={() => setMostrarSelectorProductos(false)}
+                          className="text-gray-500 hover:text-gray-700 text-lg"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          value={busquedaProducto}
+                          onChange={(e) => setBusquedaProducto(e.target.value)}
+                          placeholder="Buscar producto..."
+                          className="w-full border p-1 rounded text-sm mb-2"
+                          autoFocus
+                        />
+                        {productos
+                          .filter(p => 
+                            p.nombre?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
+                            p.codigoInterno?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
+                            p.codigoBarras?.toLowerCase().includes(busquedaProducto.toLowerCase())
+                          )
+                          .map(producto => (
+                            <label
+                              key={producto.id}
+                              className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={productosSeleccionados.includes(producto.id)}
+                                onChange={() => toggleProducto(producto.id)}
+                                className="rounded"
+                              />
+                              <span className="text-xs text-gray-500 w-16">{producto.codigoInterno}</span>
+                              <span className="text-sm truncate">{producto.nombre}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {productosSeleccionados.length > 0 && (
+                  <button
+                    onClick={limpiarProductos}
+                    className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {productosSeleccionados.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {productosSeleccionados.map(id => {
+                    const prod = productos.find(p => p.id === id);
+                    return prod ? (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs"
+                      >
+                        {prod.codigoInterno}
+                        <button
+                          onClick={() => toggleProducto(id)}
+                          className="text-indigo-500 hover:text-indigo-700"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
