@@ -13,6 +13,38 @@ const METODOS_PAGO = [
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
+const FIREBASE_FUNCTIONS_URL = 'https://facturarventa-v7nkl2aufq-uc.a.run.app';
+const AFIP_PTO_VTA = 9;
+
+const calcularIva = (total) => {
+  const neto = Math.round(total / 1.21 * 100) / 100;
+  const iva = Math.round((total - neto) * 100) / 100;
+  return { neto, iva };
+};
+
+const necesitaFacturaAuto = (tiposPago) => {
+  const metodosAuto = ['tarjeta', 'debito', 'cuentadni'];
+  return metodosAuto.some(m => tiposPago.includes(m));
+};
+
+const facturarVenta = async (ventaId, total, tipoFactura, documentoCliente) => {
+  try {
+    const response = await fetch(FIREBASE_FUNCTIONS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ventaId, total, tipoFactura, documentoCliente })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Error al facturar');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error al facturar:', error);
+    throw error;
+  }
+};
+
 export const VentasPage = () => {
   const { user } = useAuth();
   const { isMobile } = useDevice();
@@ -25,6 +57,13 @@ export const VentasPage = () => {
   const [caja, setCaja] = useState(null);
   const [observacion, setObservacion] = useState('');
   const [ventaExitosa, setVentaExitosa] = useState(null);
+  const [facturaData, setFacturaData] = useState(null);
+  const [facturando, setFacturando] = useState(false);
+  
+  // Modal facturación
+  const [mostrarModalFactura, setMostrarModalFactura] = useState(false);
+  const [tipoFacturaSeleccionado, setTipoFacturaSeleccionado] = useState(null);
+  const [cuitCliente, setCuitCliente] = useState('');
   
   // Métodos de pago seleccionados
   const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0 }]);
@@ -191,18 +230,19 @@ export const VentasPage = () => {
     setTimeout(() => printWindow.print(), 250);
   };
 
-  const imprimirTicketVenta = () => {
+const imprimirTicketVenta = () => {
     if (!ventaExitosa || !caja) return;
     
     const fecha = new Date().toLocaleString('es-AR');
     const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
     const ventaId = ventaExitosa.id.slice(-6).toUpperCase();
+    const { neto, iva } = calcularIva(ventaExitosa.total);
     
     let ticket = `====================================
       SANTOS Y SANTAS
     ${direccion}
     Tel: 2915245537
-====================================
+===================================
 ${fecha}    Vta: ${ventaId}
 ───────────────────────────────────
 PRODUCTO              CANT    IMP
@@ -234,11 +274,16 @@ ${nombre} ${item.cantidad.toString().padStart(3)} -${importe.padStart(5)}`;
       }
     }
     
-    const total = ventaExitosa.total.toLocaleString('es-AR', { minimumFractionDigits: 0 });
+    const totalFormateado = ventaExitosa.total.toLocaleString('es-AR', { minimumFractionDigits: 0 });
+    const netoFormateado = neto.toLocaleString('es-AR', { minimumFractionDigits: 0 });
+    const ivaFormateado = iva.toLocaleString('es-AR', { minimumFractionDigits: 0 });
     
     ticket += `
 ───────────────────────────────────
-TOTAL:                     $${total}
+Subtotal (neto):      $${netoFormateado.padStart(8)}
+IVA 21%:              $${ivaFormateado.padStart(8)}
+───────────────────────────────────
+TOTAL:                $${totalFormateado.padStart(8)}
 ───────────────────────────────────`;
     
     const metodosPago = ventaExitosa.tipoPago.map(p => {
@@ -247,13 +292,28 @@ TOTAL:                     $${total}
     }).join(', ');
     
     ticket += `
-PAGO: ${metodosPago}
+PAGO: ${metodosPago}`;
+
+if (facturaData) {
+      const ptoVta = '00009';
+      const nroFactura = String(facturaData.numero).padStart(8, '0');
+      const fechaVto = facturaData.fechaVto ? `${facturaData.fechaVto.slice(6,8)}/${facturaData.fechaVto.slice(4,6)}/${facturaData.fechaVto.slice(0,4)}` : '-';
+      const tipoFacturaLabel = facturaData.tipoFactura === 'A' ? 'FACTURA A' : 'FACTURA B';
+      ticket += `
+───────────────────────────────────
+         ${tipoFacturaLabel}
+ CAE: ${facturaData.cae}
+ Vto: ${fechaVto}
+ N°: ${ptoVta}-${nroFactura}`;
+    }
+    
+    ticket += `
 ====================================
      Gracias por su compra!
         Vuelve pronto :)
-====================================`;
+===================================`;
     
-    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    const printWindow = window.open('', '_blank', 'width=300,height=700');
     printWindow.document.write(`
       <html>
         <head>
@@ -268,6 +328,75 @@ PAGO: ${metodosPago}
     `);
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 250);
+  };
+
+  const handleFacturarManual = async () => {
+    if (!ventaExitosa) return;
+    setTipoFacturaSeleccionado('B');
+    setCuitCliente('');
+    setMostrarModalFactura(true);
+  };
+
+  const handleFacturaA = () => {
+    if (!ventaExitosa) return;
+    setTipoFacturaSeleccionado('A');
+    setCuitCliente('');
+    setMostrarModalFactura(true);
+  };
+
+  const handleConfirmarFactura = async () => {
+    if (!ventaExitosa) return;
+    
+    if (tipoFacturaSeleccionado === 'A' && (!cuitCliente || cuitCliente.length !== 11)) {
+      alert('Para Factura A debe ingresar un CUIT válido (11 dígitos)');
+      return;
+    }
+    
+    setMostrarModalFactura(false);
+    setFacturando(true);
+    try {
+      const resultado = await facturarVenta(
+        ventaExitosa.id,
+        ventaExitosa.total,
+        tipoFacturaSeleccionado,
+        tipoFacturaSeleccionado === 'A' ? cuitCliente : null
+      );
+      setFacturaData(resultado);
+      
+      await updateDoc(doc(db, 'ventas', ventaExitosa.id), {
+        cae: resultado.cae,
+        facturaNumero: resultado.numero,
+        facturaFechaVto: resultado.fechaVto,
+        facturaTipo: `Factura ${tipoFacturaSeleccionado}`,
+        facturaPtoVta: AFIP_PTO_VTA,
+        facturaNeto: resultado.neto,
+        facturaIva: resultado.iva,
+        facturaDocCliente: tipoFacturaSeleccionado === 'A' ? cuitCliente : null
+      });
+    } catch (error) {
+      alert(`Error al facturar: ${error.message}`);
+    } finally {
+      setFacturando(false);
+    }
+  };
+
+  const handleFacturaAuto = async (tipo) => {
+    if (!ventaExitosa) return;
+    
+    if (tipo === 'A') {
+      setTipoFacturaSeleccionado('A');
+      setMostrarModalFactura(true);
+    } else {
+      setFacturando(true);
+      try {
+        const resultado = await facturarVenta(ventaExitosa.id, ventaExitosa.total, 'B', null);
+        setFacturaData(resultado);
+      } catch (error) {
+        alert(`Error al facturar: ${error.message}`);
+      } finally {
+        setFacturando(false);
+      }
+    }
   };
 
   const realizarVenta = async () => {
@@ -380,14 +509,48 @@ PAGO: ${metodosPago}
       setCarrito([]);
       setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
       setObservacion('');
-      setVentaExitosa({
+      setFacturaData(null);
+      
+      const nuevaVenta = {
         id: ventaDoc.id,
         total,
         productos: productosVenta,
-        tipoPago: pagosSeleccionados,
+        tipoPago: pagosSeleccionados.map(p => p.metodo),
         tipoVenta,
         negocio: caja.sucursal,
-      });
+      };
+      setVentaExitosa(nuevaVenta);
+      
+      if (necesitaFacturaAuto(pagosSeleccionados.map(p => p.metodo))) {
+        const wantsFacturaA = window.confirm('¿Desea generar Factura A?\n\nAceptar = Factura A (requiere CUIT)\nCancelar = Factura B (consumidor final)');
+        
+        if (wantsFacturaA) {
+          setTipoFacturaSeleccionado('A');
+          setCuitCliente('');
+          setMostrarModalFactura(true);
+        } else {
+          setFacturando(true);
+          try {
+            const resultado = await facturarVenta(ventaDoc.id, total, 'B', null);
+            setFacturaData(resultado);
+            
+            await updateDoc(doc(db, 'ventas', ventaDoc.id), {
+              cae: resultado.cae,
+              facturaNumero: resultado.numero,
+              facturaFechaVto: resultado.fechaVto,
+              facturaTipo: 'Factura B',
+              facturaPtoVta: AFIP_PTO_VTA,
+              facturaNeto: resultado.neto,
+              facturaIva: resultado.iva
+            });
+          } catch (error) {
+            console.error('Error en facturación automática:', error);
+          } finally {
+            setFacturando(false);
+          }
+        }
+      }
+      
       alert('Venta realizada con éxito');
     } catch (err) {
       console.error(err);
@@ -691,10 +854,82 @@ PAGO: ${metodosPago}
                   🖨️ Imprimir Ticket
                 </button>
               </div>
+              {facturaData && (
+                <div className="mt-2 text-sm bg-white border border-green-300 rounded p-2">
+                  <span className="font-semibold">📄 {facturaData.tipoFactura === 'A' ? 'Factura A' : 'Factura B'}</span>
+                  <span className="ml-2">CAE: {facturaData.cae}</span>
+                  <span className="ml-2">N°: 00009-{String(facturaData.numero).padStart(8, '0')}</span>
+                </div>
+              )}
+              {!facturaData && !facturando && (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={handleFacturaA}
+                    className="flex-1 bg-blue-100 text-blue-700 py-1 px-2 rounded text-xs hover:bg-blue-200"
+                  >
+                    📄 Factura A
+                  </button>
+                  <button
+                    onClick={handleFacturarManual}
+                    className="flex-1 bg-gray-100 text-gray-700 py-1 px-2 rounded text-xs hover:bg-gray-200"
+                  >
+                    📄 Cons. Final
+                  </button>
+                </div>
+              )}
+              {facturando && (
+                <p className="mt-2 text-sm text-blue-600">⏳ Generando factura...</p>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Modal para ingresar CUIT */}
+      {mostrarModalFactura && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold mb-4">
+              {tipoFacturaSeleccionado === 'A' ? '📄 Factura A' : '📄 Factura Consumidor Final'}
+            </h3>
+            
+            {tipoFacturaSeleccionado === 'A' && (
+              <div className="mb-4">
+                <label className="block text-sm font-semibold mb-1">CUIT del comprador (sin guiones)</label>
+                <input
+                  type="text"
+                  value={cuitCliente}
+                  onChange={(e) => setCuitCliente(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Ej: 20123456789"
+                  maxLength={11}
+                  className="w-full border p-2 rounded"
+                />
+                <p className="text-xs text-gray-500 mt-1">Ingresá los 11 dígitos del CUIT</p>
+              </div>
+            )}
+            
+            {tipoFacturaSeleccionado === 'B' && (
+              <p className="mb-4 text-gray-600">Se generará una Factura B para consumidor final.</p>
+            )}
+            
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmarFactura}
+                disabled={tipoFacturaSeleccionado === 'A' && (!cuitCliente || cuitCliente.length !== 11)}
+                className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                Confirmar
+              </button>
+              <button
+                onClick={() => setMostrarModalFactura(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
