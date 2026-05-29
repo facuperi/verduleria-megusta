@@ -98,21 +98,23 @@ export const CajaPage = () => {
           }
           
           // Traer ventas de hoy para esta caja
-          const ventasSnapshot = await getDocs(collection(db, 'ventas'));
-          const fechaApertura = cajaData.fecha?.toDate ? cajaData.fecha.toDate() : new Date(cajaData.fecha);
-          const ventasDelTurno = ventasSnapshot.docs
-            .filter(d => {
-              const fechaVenta = d.data().fecha?.toDate ? d.data().fecha.toDate() : new Date(d.data().fecha);
-              return fechaVenta >= fechaApertura && d.data().negocio === cajaData.sucursal;
-            })
-            .map(d => ({ id: d.id, ...d.data() }));
+          const fechaApertura = new Date(cajaData.fecha);
+          const ventasQuery = query(
+            collection(db, 'ventas'),
+            where('fecha', '>=', fechaApertura),
+            where('negocio', '==', cajaData.sucursal)
+          );
+          const ventasSnapshot = await getDocs(ventasQuery);
+          const ventasDelTurno = ventasSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setVentasHoy(ventasDelTurno);
           
           // Traer retiros de esta caja
-          const retirosSnapshot = await getDocs(collection(db, 'retirosCaja'));
-          const retirosDelTurno = retirosSnapshot.docs
-            .filter(d => d.data().cajaId === cajaData.id)
-            .map(d => ({ id: d.id, ...d.data() }));
+          const retirosQuery = query(
+            collection(db, 'retirosCaja'),
+            where('cajaId', '==', cajaData.id)
+          );
+          const retirosSnapshot = await getDocs(retirosQuery);
+          const retirosDelTurno = retirosSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setRetiros(retirosDelTurno);
           
           // Traer tipos de retiro personalizados
@@ -321,10 +323,12 @@ export const CajaPage = () => {
       setCaja({ ...caja, montoEfectivo: nuevoEfectivoCaja });
       
       // Recargar retiros
-      const retirosSnapshot = await getDocs(collection(db, 'retirosCaja'));
-      const retirosActualizados = retirosSnapshot.docs
-        .filter(d => d.data().cajaId === caja.id)
-        .map(d => ({ id: d.id, ...d.data() }));
+      const retirosQuery = query(
+        collection(db, 'retirosCaja'),
+        where('cajaId', '==', caja.id)
+      );
+      const retirosSnapshot = await getDocs(retirosQuery);
+      const retirosActualizados = retirosSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setRetiros(retirosActualizados);
       
       setMostrarModalRetiro(false);

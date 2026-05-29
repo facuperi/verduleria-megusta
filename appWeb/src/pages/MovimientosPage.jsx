@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -28,13 +28,14 @@ export const MovimientosPage = () => {
       try {
         const [prodSnapshot, movSnapshot] = await Promise.all([
           getDocs(collection(db, 'productos')),
-          getDocs(collection(db, 'movimientosStock')),
+          getDocs(query(
+            collection(db, 'movimientosStock'),
+            orderBy('fecha', 'desc'),
+            limit(50)
+          )),
         ]);
         setProductos(prodSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        
-        const movs = movSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        movs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-        setMovimientos(movs.slice(0, 50));
+        setMovimientos(movSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
         console.error(err);
       } finally {
