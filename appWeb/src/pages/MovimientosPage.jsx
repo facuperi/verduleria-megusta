@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { Layout } from '../components/Layout';
 
 export const MovimientosPage = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [productos, setProductos] = useState([]);
+  const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cargandoHistorial, setCargandoHistorial] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [showMovimiento, setShowMovimiento] = useState(false);
   const [showIngreso, setShowIngreso] = useState(false);
@@ -20,17 +24,25 @@ export const MovimientosPage = () => {
   const [ingresoNegocio, setIngresoNegocio] = useState('chiclana');
 
   useEffect(() => {
-    const fetchProductos = async () => {
+    const fetchData = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'productos'));
-        setProductos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const [prodSnapshot, movSnapshot] = await Promise.all([
+          getDocs(collection(db, 'productos')),
+          getDocs(collection(db, 'movimientosStock')),
+        ]);
+        setProductos(prodSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        
+        const movs = movSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        movs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        setMovimientos(movs.slice(0, 50));
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
+        setCargandoHistorial(false);
       }
     };
-    fetchProductos();
+    fetchData();
   }, []);
 
   const buscarProducto = (texto) => {
@@ -60,7 +72,7 @@ export const MovimientosPage = () => {
 
   const moverStock = async () => {
     if (listaMovimiento.length === 0 || movimientoOrigen === movimientoDestino) {
-      alert('Agregá productos y asegurate que origen y destino sean diferentes');
+      showToast('Agregá productos y asegurate que origen y destino sean diferentes', 'warning');
       return;
     }
     setProcesando(true);
@@ -68,7 +80,7 @@ export const MovimientosPage = () => {
       for (const item of listaMovimiento) {
         const producto = productos.find(p => p.id === item.id);
         if (producto.stockPorNegocio[movimientoOrigen] < item.cantidad) {
-          alert(`No hay suficiente stock de ${producto.nombre} en ${movimientoOrigen}`);
+          showToast(`No hay suficiente stock de ${producto.nombre} en ${movimientoOrigen}`, 'warning');
           setProcesando(false);
           return;
         }
@@ -102,10 +114,10 @@ export const MovimientosPage = () => {
       setListaMovimiento([]);
       setMovimientoOrigen('chiclana');
       setMovimientoDestino('belgrano');
-      alert('Stock movido correctamente');
+      showToast('Stock movido correctamente', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error al mover stock');
+      showToast('Error al mover stock', 'error');
     } finally {
       setProcesando(false);
     }
@@ -129,7 +141,7 @@ export const MovimientosPage = () => {
 
   const agregarStock = async () => {
     if (listaIngreso.length === 0) {
-      alert('Agregá al menos un producto');
+      showToast('Agregá al menos un producto', 'warning');
       return;
     }
     setProcesando(true);
@@ -160,10 +172,10 @@ export const MovimientosPage = () => {
       setShowIngreso(false);
       setListaIngreso([]);
       setIngresoNegocio('chiclana');
-      alert('Stock agregado correctamente');
+      showToast('Stock agregado correctamente', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error al agregar stock');
+      showToast('Error al agregar stock', 'error');
     } finally {
       setProcesando(false);
     }
@@ -199,6 +211,55 @@ export const MovimientosPage = () => {
             Abrir Ingreso
           </button>
         </div>
+      </div>
+
+      {/* Historial de movimientos */}
+      <div className="mt-8 bg-white rounded-lg shadow">
+        <div className="p-4 border-b">
+          <h3 className="text-lg font-semibold">Historial de Movimientos</h3>
+        </div>
+        {cargandoHistorial ? (
+          <div className="text-center py-8 text-gray-500">Cargando historial...</div>
+        ) : movimientos.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">No hay movimientos registrados</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="border-b">
+                  <th className="text-left px-4 py-3">Fecha</th>
+                  <th className="text-left px-4 py-3">Tipo</th>
+                  <th className="text-left px-4 py-3">Producto</th>
+                  <th className="text-center px-4 py-3">Cantidad</th>
+                  <th className="text-left px-4 py-3">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movimientos.map(m => (
+                  <tr key={m.id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                      {new Date(m.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        m.tipo === 'movimiento' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {m.tipo === 'movimiento' ? '↔ Movimiento' : '⬆ Ingreso'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium">{m.productoNombre}</td>
+                    <td className="px-4 py-3 text-center font-semibold">{m.cantidad}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {m.tipo === 'movimiento'
+                        ? `${m.origen} → ${m.destino}`
+                        : `Recibido en ${m.negocio}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal Mover Stock */}

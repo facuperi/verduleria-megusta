@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
@@ -48,6 +50,8 @@ const facturarVenta = async (ventaId, total, tipoFactura, documentoCliente) => {
 export const VentasPage = () => {
   const { user } = useAuth();
   const { isMobile } = useDevice();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [productos, setProductos] = useState([]);
   const [carrito, setCarrito] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +63,7 @@ export const VentasPage = () => {
   const [ventaExitosa, setVentaExitosa] = useState(null);
   const [facturaData, setFacturaData] = useState(null);
   const [facturando, setFacturando] = useState(false);
+  const [agregarComoNotaCredito, setAgregarComoNotaCredito] = useState(false);
   
   // Modal facturación
   const [mostrarModalFactura, setMostrarModalFactura] = useState(false);
@@ -145,7 +150,7 @@ export const VentasPage = () => {
         p.id === producto.id && p.precioSeleccionado === tipoPrecio ? { ...p, cantidad: p.cantidad + 1 } : p
       ));
     } else {
-      setCarrito([...carrito, { ...producto, cantidad: 1, precioSeleccionado: tipoPrecio, esNotaCredito: false }]);
+      setCarrito([...carrito, { ...producto, cantidad: 1, precioSeleccionado: tipoPrecio, esNotaCredito: agregarComoNotaCredito }]);
     }
     setBusqueda('');
     setVentaExitosa(null);
@@ -193,32 +198,38 @@ export const VentasPage = () => {
 
   const imprimirTicketAFavor = () => {
     const monto = Math.abs(diferencia);
-    const fecha = new Date().toLocaleString();
-    const ticket = `
-╔══════════════════════════════╗
-║     NOTA DE CRÉDITO A FAVOR   ║
-╠══════════════════════════════╣
-║ Fecha: ${fecha}
-║ Negocio: ${caja?.sucursal || 'N/A'}
-║
-║ MONTO A FAVOR: $${monto.toFixed(2)}
-║
-║ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-║ Este ticket acredita que el
-║ cliente tiene saldo a favor
-║ de $${monto.toFixed(2)}
-║
-║ Atendido por: ${user?.email || 'Usuario'}
-╚══════════════════════════════╝
-    `.trim();
+    const fecha = new Date().toLocaleString('es-AR');
+    const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
     
-    const printWindow = window.open('', '_blank', 'width=300,height=400');
+    const ticket = `====================================
+      SANTOS Y SANTAS
+    ${direccion}
+    Tel: 2915245537
+==================================
+${fecha}
+───────────────────────────────────
+   NOTA DE CREDITO A FAVOR
+───────────────────────────────────
+  MONTO A FAVOR: $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+───────────────────────────────────
+  Este ticket acredita que el
+  cliente tiene saldo a favor
+  de $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+───────────────────────────────────
+  Negocio: ${(caja.sucursal || '').toUpperCase()}
+  Atendido por: ${user?.email || 'Usuario'}
+===================================
+      Gracias por su compra!
+         Vuelve pronto :)
+==================================`;
+    
+    const printWindow = window.open('', '_blank', 'width=300,height=700');
     printWindow.document.write(`
       <html>
         <head>
           <title>Nota de Crédito</title>
           <style>
-            body { font-family: 'Courier New', monospace; font-size: 12px; white-space: pre; }
+            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
             @media print { body { margin: 0; } }
           </style>
         </head>
@@ -226,7 +237,6 @@ export const VentasPage = () => {
       </html>
     `);
     printWindow.document.close();
-    printWindow.focus();
     setTimeout(() => printWindow.print(), 250);
   };
 
@@ -348,7 +358,7 @@ if (facturaData) {
     if (!ventaExitosa) return;
     
     if (tipoFacturaSeleccionado === 'A' && (!cuitCliente || cuitCliente.length !== 11)) {
-      alert('Para Factura A debe ingresar un CUIT válido (11 dígitos)');
+      showToast('Para Factura A debe ingresar un CUIT válido (11 dígitos)', 'warning');
       return;
     }
     
@@ -374,7 +384,7 @@ if (facturaData) {
         facturaDocCliente: tipoFacturaSeleccionado === 'A' ? cuitCliente : null
       });
     } catch (error) {
-      alert(`Error al facturar: ${error.message}`);
+      showToast(`Error al facturar: ${error.message}`, 'error');
     } finally {
       setFacturando(false);
     }
@@ -392,7 +402,7 @@ if (facturaData) {
         const resultado = await facturarVenta(ventaExitosa.id, ventaExitosa.total, 'B', null);
         setFacturaData(resultado);
       } catch (error) {
-        alert(`Error al facturar: ${error.message}`);
+        showToast(`Error al facturar: ${error.message}`, 'error');
       } finally {
         setFacturando(false);
       }
@@ -510,6 +520,7 @@ if (facturaData) {
       setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
       setObservacion('');
       setFacturaData(null);
+      setAgregarComoNotaCredito(false);
       
       const nuevaVenta = {
         id: ventaDoc.id,
@@ -522,9 +533,14 @@ if (facturaData) {
       setVentaExitosa(nuevaVenta);
       
       if (necesitaFacturaAuto(pagosSeleccionados.map(p => p.metodo))) {
-        const wantsFacturaA = window.confirm('¿Desea generar Factura A?\n\nAceptar = Factura A (requiere CUIT)\nCancelar = Factura B (consumidor final)');
+        const quiereFacturaA = await confirm(
+          'Este método de pago requiere factura electrónica. ¿Qué tipo de factura querés emitir?',
+          'Facturación',
+          'Factura A (con CUIT)',
+          'Factura B (consumidor final)'
+        );
         
-        if (wantsFacturaA) {
+        if (quiereFacturaA) {
           setTipoFacturaSeleccionado('A');
           setCuitCliente('');
           setMostrarModalFactura(true);
@@ -551,7 +567,7 @@ if (facturaData) {
         }
       }
       
-      alert('Venta realizada con éxito');
+      showToast('Venta realizada con éxito', 'success');
     } catch (err) {
       console.error(err);
       setError('Error al realizar venta');
@@ -604,7 +620,15 @@ if (facturaData) {
         {/* Columna 1: Búsqueda y productos */}
         <div className="md:col-span-2">
           <div className="bg-white p-4 rounded-lg shadow mb-4">
-            <h3 className="font-semibold mb-2">Buscar producto (código de barras, código interno o nombre)</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="font-semibold">Buscar producto (código de barras, código interno o nombre)</h3>
+              <button
+                onClick={() => setAgregarComoNotaCredito(!agregarComoNotaCredito)}
+                className={`px-3 py-1 rounded text-xs font-semibold border ${agregarComoNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
+              >
+                {agregarComoNotaCredito ? '⚠️ Nota Crédito' : 'Agregar como Nota Crédito'}
+              </button>
+            </div>
             <input
               ref={inputScannerRef}
               type="text"
@@ -652,7 +676,7 @@ if (facturaData) {
                 <div
                   key={producto.id}
                   onClick={() => agregarAlCarrito(producto)}
-                  className="bg-white p-3 rounded-lg shadow cursor-pointer hover:bg-gray-50"
+                  className={`bg-white p-3 rounded-lg shadow cursor-pointer hover:bg-gray-50 ${agregarComoNotaCredito ? 'ring-2 ring-red-400' : ''}`}
                 >
                   <h4 className="font-semibold text-sm">{producto.nombre}</h4>
                   <p className="text-xs text-gray-500">{producto.codigoInterno}</p>

@@ -3,12 +3,16 @@ import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc } from '
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
 export const UsuariosPage = () => {
   const { isGerente, user } = useAuth();
   const { isMobile } = useDevice();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -59,14 +63,19 @@ export const UsuariosPage = () => {
       const snapshot = await getDocs(collection(db, 'users'));
       setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
-      alert('Error al guardar usuario: ' + err.message);
+      showToast('Error al guardar usuario: ' + err.message, 'error');
     }
   };
 
   const eliminarUsuario = async (id) => {
-    if (confirm('¿Estás seguro de eliminar este usuario?')) {
+    const ok = await confirm('¿Estás seguro de eliminar este usuario?', 'Eliminar usuario');
+    if (!ok) return;
+    try {
       await deleteDoc(doc(db, 'users', id));
       setUsuarios(usuarios.filter(u => u.id !== id));
+      showToast('Usuario eliminado', 'success');
+    } catch (err) {
+      showToast('Error al eliminar usuario: ' + err.message, 'error');
     }
   };
 

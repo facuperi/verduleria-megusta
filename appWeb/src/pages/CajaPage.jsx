@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, getDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, getDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
@@ -20,9 +22,19 @@ const TIPOS_RETIRO_FIJOS = [
   { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
 ];
 
+const METODOS_PAGO = [
+  { id: 'efectivo', nombre: 'Efectivo' },
+  { id: 'tarjeta', nombre: 'Tarjeta' },
+  { id: 'debito', nombre: 'Débito' },
+  { id: 'mercadopago', nombre: 'MercadoPago' },
+  { id: 'cuentadni', nombre: 'Cuenta DNI' },
+];
+
 export const CajaPage = () => {
-  const { user } = useAuth();
+  const { user, isGerente } = useAuth();
   const { isMobile } = useDevice();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [caja, setCaja] = useState(null);
   const [ventasHoy, setVentasHoy] = useState([]);
   const [retiros, setRetiros] = useState([]);
@@ -50,6 +62,12 @@ export const CajaPage = () => {
   const [negocioSeleccionado, setNegocioSeleccionado] = useState('');
   const [saldoApertura, setSaldoApertura] = useState('');
   const [saldoCierre, setSaldoCierre] = useState('');
+
+  // Editar venta
+  const [editandoVenta, setEditandoVenta] = useState(null);
+  const [nuevoTotal, setNuevoTotal] = useState('');
+  const [nuevosPagos, setNuevosPagos] = useState([]);
+  const [motivoEdicion, setMotivoEdicion] = useState('');
 
   const restriction = checkDeviceRestriction('aperturaCaja');
   const canAccess = !isMobile;
@@ -133,7 +151,7 @@ export const CajaPage = () => {
       setSaldoApertura('');
     } catch (err) {
       console.error(err);
-      alert('Error al abrir caja');
+      showToast('Error al abrir caja', 'error');
     } finally {
       setProcesando(false);
     }
@@ -141,10 +159,10 @@ export const CajaPage = () => {
 
   const calcularVentas = () => {
     const ventasNormales = ventasHoy.filter(v => v.tipoVenta === 'normal' || v.tipoVenta === 'mixta');
-    const notasCredito = ventasHoy.filter(v => v.tipoVenta === 'notaCredito' || (v.tipoVenta === 'mixta' && v.diferencia < 0));
+    const notasCredito = ventasHoy.filter(v => v.tipoVenta === 'notaCredito' || v.totalNotaCredito > 0);
     
-    const montoVentasNormales = ventasNormales.reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
-    const montoNotasCredito = notasCredito.reduce((sum, v) => sum + Math.abs(v.diferencia || v.total), 0);
+    const montoVentasNormales = ventasNormales.reduce((sum, v) => sum + (v.totalVenta || v.total), 0);
+    const montoNotasCredito = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
     
     const ventasEfectivo = ventasNormales
       .filter(v => v.tipoPago?.includes('efectivo'))
@@ -166,7 +184,7 @@ export const CajaPage = () => {
       .filter(v => v.tipoPago?.includes('cuentadni'))
       .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
     
-    const notasCreditoEfectivo = notasCredito.reduce((sum, v) => sum + Math.abs(v.diferencia || v.total), 0);
+    const notasCreditoEfectivo = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
     const totalRetiros = retiros.reduce((sum, r) => sum + r.monto, 0);
     
     const ventasBrutas = montoVentasNormales;
@@ -237,19 +255,19 @@ export const CajaPage = () => {
 
   const crearRetiro = async () => {
     if (!tipoRetiro || !montoRetiro) {
-      alert('Completá el tipo de retiro y el monto');
+      showToast('Completá el tipo de retiro y el monto', 'warning');
       return;
     }
     
     const monto = parseFloat(montoRetiro);
     if (monto <= 0) {
-      alert('El monto debe ser mayor a 0');
+      showToast('El monto debe ser mayor a 0', 'warning');
       return;
     }
     
     const { efectivoCaja: efectivoActual } = calcularVentas();
     if (monto > efectivoActual) {
-      alert(`No podés retirar más de lo que hay en efectivo ($${efectivoActual})`);
+      showToast(`No podés retirar más de lo que hay en efectivo ($${efectivoActual})`, 'warning');
       return;
     }
     
@@ -288,10 +306,10 @@ export const CajaPage = () => {
       setTipoRetiro('');
       setMontoRetiro('');
       setObservacionRetiro('');
-      alert('Retiro registrado con éxito');
+      showToast('Retiro registrado con éxito', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error al registrar retiro');
+      showToast('Error al registrar retiro', 'error');
     } finally {
       setProcesando(false);
     }
@@ -299,14 +317,14 @@ export const CajaPage = () => {
 
   const crearTipoRetiro = async () => {
     if (!nombreNuevoTipo.trim()) {
-      alert('Ingresá un nombre para el tipo de retiro');
+      showToast('Ingresá un nombre para el tipo de retiro', 'warning');
       return;
     }
     
     const nuevoId = nombreNuevoTipo.toLowerCase().replace(/\s+/g, '');
     const existe = [...TIPOS_RETIRO_FIJOS, ...tiposRetiroPersonalizados].find(t => t.id === nuevoId);
     if (existe) {
-      alert('Ya existe un tipo de retiro con ese nombre');
+      showToast('Ya existe un tipo de retiro con ese nombre', 'warning');
       return;
     }
     
@@ -322,10 +340,10 @@ export const CajaPage = () => {
       setMostrarModalNuevoTipo(false);
       setNombreNuevoTipo('');
       setIconoNuevoTipo('💰');
-      alert('Tipo de retiro creado con éxito');
+      showToast('Tipo de retiro creado con éxito', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error al crear tipo de retiro');
+      showToast('Error al crear tipo de retiro', 'error');
     } finally {
       setProcesando(false);
     }
@@ -404,6 +422,125 @@ ${fechaCierre}    ${sucursalNombre}
     `);
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 250);
+  };
+
+  const handleOpenEdit = (venta) => {
+    if (venta.cae) {
+      showToast('No se puede modificar una venta facturada', 'warning');
+      return;
+    }
+    setEditandoVenta(venta);
+    setNuevoTotal(venta.total?.toString() || '0');
+    setNuevosPagos(venta.tipoPago || ['efectivo']);
+    setMotivoEdicion('');
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!editandoVenta) return;
+    if (!motivoEdicion.trim()) {
+      showToast('Debés ingresar un motivo de modificación', 'warning');
+      return;
+    }
+
+    setProcesando(true);
+    try {
+      await updateDoc(doc(db, 'ventas', editandoVenta.id), {
+        total: parseFloat(nuevoTotal) || 0,
+        tipoPago: nuevosPagos,
+        modificadoPor: user.uid,
+        modificadoPorNombre: user.email || 'Usuario',
+        modificadoEn: new Date().toISOString(),
+        motivoModificacion: motivoEdicion.trim(),
+        valoresOriginales: {
+          total: editandoVenta.total,
+          tipoPago: editandoVenta.tipoPago,
+        },
+      });
+
+      setVentasHoy(ventasHoy.map(v =>
+        v.id === editandoVenta.id
+          ? { ...v, total: parseFloat(nuevoTotal) || 0, tipoPago: nuevosPagos }
+          : v
+      ));
+
+      setEditandoVenta(null);
+      showToast('Venta modificada correctamente', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al modificar venta', 'error');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const handleEliminarVenta = async (venta) => {
+    if (venta.cae) {
+      showToast('No se puede eliminar una venta facturada', 'warning');
+      return;
+    }
+
+    const ok = await confirm(
+      '¿Estás seguro de eliminar esta venta? El stock se restaurará automáticamente.',
+      'Eliminar venta'
+    );
+    if (!ok) return;
+
+    setProcesando(true);
+    try {
+      for (const item of (venta.productos || [])) {
+        if (!item.productoId) continue;
+        const productoRef = doc(db, 'productos', item.productoId);
+        const productoDoc = await getDoc(productoRef);
+        if (!productoDoc.exists()) continue;
+
+        const productoData = productoDoc.data();
+        const stockActual = productoData.stockPorNegocio?.[venta.negocio] || 0;
+        const stockGlobalActual = productoData.stockGlobal || 0;
+        const cambioStock = item.esNotaCredito ? -item.cantidad : item.cantidad;
+
+        await updateDoc(productoRef, {
+          [`stockPorNegocio.${venta.negocio}`]: stockActual + cambioStock,
+          stockGlobal: stockGlobalActual + cambioStock,
+        });
+      }
+
+      const cajaRef = doc(db, 'caja', caja.id);
+      const cajaSnap = await getDoc(cajaRef);
+      if (cajaSnap.exists()) {
+        const cajaData = cajaSnap.data();
+        const updateData = {};
+        const metodos = venta.tipoPago || [];
+
+        if (metodos.length === 1) {
+          const campoKey = {
+            efectivo: 'ventasEfectivo',
+            tarjeta: 'ventasTarjeta',
+            debito: 'ventasDebito',
+            mercadopago: 'ventasMercadoPago',
+            cuentadni: 'ventasCuentaDNI',
+          }[metodos[0]];
+          if (campoKey) {
+            updateData[campoKey] = (cajaData[campoKey] || 0) - (venta.total || 0);
+          }
+          if (metodos[0] === 'efectivo') {
+            updateData.montoEfectivo = (cajaData.montoEfectivo || 0) - (venta.total || 0);
+          }
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await updateDoc(cajaRef, updateData);
+        }
+      }
+
+      await deleteDoc(doc(db, 'ventas', venta.id));
+      setVentasHoy(ventasHoy.filter(v => v.id !== venta.id));
+      showToast('Venta eliminada y stock restaurado', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al eliminar venta', 'error');
+    } finally {
+      setProcesando(false);
+    }
   };
 
   if (loading) {
@@ -570,12 +707,13 @@ ${fechaCierre}    ${sucursalNombre}
                       <th className="text-left py-2">Monto</th>
                       <th className="text-left py-2">Método</th>
                       <th className="text-left py-2">Observación</th>
+                      {isGerente && <th className="text-right py-2 w-20">Acciones</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {ventasHoy.length === 0 && retiros.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-4 text-gray-500">No hay movimientos aún</td>
+                        <td colSpan={isGerente ? 6 : 5} className="text-center py-4 text-gray-500">No hay movimientos aún</td>
                       </tr>
                     ) : (
                       [...ventasHoy, ...retiros]
@@ -598,6 +736,7 @@ ${fechaCierre}    ${sucursalNombre}
                                 </td>
                                 <td className="py-2 capitalize text-gray-600">-</td>
                                 <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
+                                {isGerente && <td className="py-2"></td>}
                               </tr>
                             );
                           }
@@ -634,6 +773,20 @@ ${fechaCierre}    ${sucursalNombre}
                                 }).join(', ') || '-'}
                               </td>
                               <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
+                              {isGerente && (
+                                <td className="py-2 text-right whitespace-nowrap">
+                                  <button
+                                    onClick={() => handleOpenEdit(item)}
+                                    className="text-blue-600 hover:text-blue-800 mr-1 text-xs"
+                                    title="Editar"
+                                  >✏️</button>
+                                  <button
+                                    onClick={() => handleEliminarVenta(item)}
+                                    className="text-red-600 hover:text-red-800 text-xs"
+                                    title="Eliminar"
+                                  >🗑️</button>
+                                </td>
+                              )}
                             </tr>
                           );
                         })
@@ -650,7 +803,7 @@ ${fechaCierre}    ${sucursalNombre}
                           <span className="text-orange-600 ml-2">R: -${retiros.reduce((sum, r) => sum + r.monto, 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
                         )}
                       </td>
-                      <td className="py-2 text-blue-700" colSpan={2}>
+                      <td className="py-2 text-blue-700" colSpan={isGerente ? 3 : 2}>
                         Efectivo: ${efectivoCaja.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                       </td>
                     </tr>
@@ -878,6 +1031,77 @@ ${fechaCierre}    ${sucursalNombre}
                   Cancelar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editandoVenta && isGerente && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold mb-4">Modificar Venta</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1">Total</label>
+              <input
+                type="number"
+                step="0.01"
+                value={nuevoTotal}
+                onChange={(e) => setNuevoTotal(e.target.value)}
+                className="w-full border p-2 rounded"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1">Métodos de pago</label>
+              <div className="space-y-1">
+                {METODOS_PAGO.map(m => (
+                  <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={nuevosPagos.includes(m.id)}
+                      onChange={() => {
+                        setNuevosPagos(prev =>
+                          prev.includes(m.id)
+                            ? prev.filter(p => p !== m.id)
+                            : [...prev, m.id]
+                        );
+                      }}
+                      className="rounded"
+                    />
+                    {m.nombre}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1">
+                Motivo de modificación <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={motivoEdicion}
+                onChange={(e) => setMotivoEdicion(e.target.value)}
+                placeholder="Ej: Cliente pagó con tarjeta, no efectivo"
+                className="w-full border p-2 rounded text-sm"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleGuardarEdicion}
+                disabled={procesando || !motivoEdicion.trim()}
+                className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 font-medium"
+              >
+                {procesando ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+              <button
+                onClick={() => setEditandoVenta(null)}
+                className="px-4 py-2 border rounded hover:bg-gray-50 font-medium"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

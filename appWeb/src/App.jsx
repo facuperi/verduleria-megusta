@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { LoginPage } from './pages/LoginPage';
 import { VentasPage } from './pages/VentasPage';
 import { StockPage } from './pages/StockPage';
@@ -52,36 +54,40 @@ function App() {
   }
 
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/ventas" element={<VentasPage />} />
-          <Route path="/stock" element={<StockPage />} />
-          <Route path="/movimientos" element={
-            <PrivateRoute requiredRole="gerente">
-              <MovimientosPage />
-            </PrivateRoute>
-          } />
-          <Route path="/caja" element={
-            <PrivateRoute>
-              <CajaPage />
-            </PrivateRoute>
-          } />
-          <Route path="/reportes" element={
-            <PrivateRoute requiredRole="gerente">
-              <ReportesPage />
-            </PrivateRoute>
-          } />
-          <Route path="/usuarios" element={
-            <PrivateRoute requiredRole="gerente">
-              <UsuariosPage />
-            </PrivateRoute>
-          } />
-          <Route path="/" element={<Navigate to="/login" />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ToastProvider>
+      <ConfirmProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/ventas" element={<VentasPage />} />
+              <Route path="/stock" element={<StockPage />} />
+              <Route path="/movimientos" element={
+                <PrivateRoute requiredRole="gerente">
+                  <MovimientosPage />
+                </PrivateRoute>
+              } />
+              <Route path="/caja" element={
+                <PrivateRoute>
+                  <CajaPage />
+                </PrivateRoute>
+              } />
+              <Route path="/reportes" element={
+                <PrivateRoute requiredRole="gerente">
+                  <ReportesPage />
+                </PrivateRoute>
+              } />
+              <Route path="/usuarios" element={
+                <PrivateRoute requiredRole="gerente">
+                  <UsuariosPage />
+                </PrivateRoute>
+              } />
+              <Route path="/" element={<Navigate to="/login" />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </ConfirmProvider>
+    </ToastProvider>
   );
 }
 

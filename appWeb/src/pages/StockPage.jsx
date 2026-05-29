@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
 export const StockPage = () => {
   const { isGerente, user } = useAuth();
   const { isMobile } = useDevice();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
@@ -88,16 +93,18 @@ export const StockPage = () => {
 
   const eliminarProducto = async (id) => {
     if (eliminando) return;
-    if (confirm('¿Estás seguro de eliminar este producto?')) {
-      setEliminando(true);
-      try {
-        await deleteDoc(doc(db, 'productos', id));
-        setProductos(productos.filter(p => p.id !== id));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setEliminando(false);
-      }
+    const ok = await confirm('¿Estás seguro de eliminar este producto?', 'Eliminar producto');
+    if (!ok) return;
+    setEliminando(true);
+    try {
+      await deleteDoc(doc(db, 'productos', id));
+      setProductos(productos.filter(p => p.id !== id));
+      showToast('Producto eliminado', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al eliminar producto', 'error');
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -113,6 +120,30 @@ export const StockPage = () => {
       stockBelgrano: producto.stockPorNegocio?.belgrano || 0,
     });
     setShowModal(true);
+  };
+
+  const exportarExcel = () => {
+    const datos = productos.map(p => ({
+      'Código Barras': p.codigoBarras || '',
+      'Código Interno': p.codigoInterno || '',
+      Nombre: p.nombre || '',
+      'Precio Efectivo': p.precioEfectivo || 0,
+      'Precio Tarjeta': p.precioTarjeta || 0,
+      'Stock Chiclana': p.stockPorNegocio?.chiclana || 0,
+      'Stock Belgrano': p.stockPorNegocio?.belgrano || 0,
+      'Stock Global': p.stockGlobal || 0,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(datos);
+    const colWidths = [
+      { wch: 18 }, { wch: 15 }, { wch: 30 },
+      { wch: 16 }, { wch: 14 },
+      { wch: 14 }, { wch: 14 }, { wch: 12 },
+    ];
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+    XLSX.writeFile(wb, `productos_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const productosFiltrados = productos.filter(p => 
@@ -136,6 +167,14 @@ export const StockPage = () => {
               className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-gray-200'}`}
             >
               {mostrarGlobal ? 'Ver por Negocio' : 'Ver Global'}
+            </button>
+          )}
+          {isGerente && (
+            <button
+              onClick={exportarExcel}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              📊 Exportar Excel
             </button>
           )}
           {puedeEditar && (

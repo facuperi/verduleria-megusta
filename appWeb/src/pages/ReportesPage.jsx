@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { collection, getDocs, getDoc, updateDoc, doc } from "firebase/firestore";
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 
@@ -43,6 +44,7 @@ const METODOS_PAGO = [
 export const ReportesPage = () => {
   const { isGerente } = useAuth();
   const { isMobile } = useDevice();
+  const { showToast } = useToast();
 
   // ==== PASO 1: Estados base ====
   const [fechaDesde, setFechaDesde] = useState('');
@@ -61,6 +63,7 @@ export const ReportesPage = () => {
   const [productosSeleccionados, setProductosSeleccionados] = useState([]);
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [mostrarSelectorProductos, setMostrarSelectorProductos] = useState(false);
+  const [facturaFilter, setFacturaFilter] = useState('todos');
 
   const restriction = checkDeviceRestriction('reportes');
   const canAccess = !isMobile && isGerente;
@@ -77,7 +80,7 @@ export const ReportesPage = () => {
       const retirosSinNegocio = retiros.filter(r => !r.negocio);
       
       if (retirosSinNegocio.length === 0) {
-        alert('No hay retiros para migrar');
+        showToast('No hay retiros para migrar', 'info');
         setMigrando(false);
         return;
       }
@@ -97,11 +100,11 @@ export const ReportesPage = () => {
         }
       }
       
-      alert(`Se actualizaron ${actualizados} retiros`);
+      showToast(`Se actualizaron ${actualizados} retiros`, 'success');
       setRetirosPendientes(0);
     } catch (err) {
       console.error('Error al migrar:', err);
-      alert('Error al migrar retiros');
+      showToast('Error al migrar retiros', 'error');
     } finally {
       setMigrando(false);
     }
@@ -126,7 +129,7 @@ export const ReportesPage = () => {
   // ==== PASO 2: Función de carga de datos ====
   const cargarMovimientos = async () => {
     if (!fechaDesde || !fechaHasta) {
-      alert('Seleccioná fecha desde y hasta');
+      showToast('Seleccioná fecha desde y hasta', 'warning');
       return;
     }
 
@@ -202,7 +205,7 @@ export const ReportesPage = () => {
       aplicarFiltros(todos);
     } catch (err) {
       console.error('Error al cargar movimientos:', err);
-      alert('Error al cargar datos');
+      showToast('Error al cargar datos', 'error');
     } finally {
       setLoading(false);
     }
@@ -261,6 +264,13 @@ export const ReportesPage = () => {
       if (tipoMovimiento !== 'ventas' || productosSeleccionados.length === 0) return true;
       const productosVenta = m.productos?.map(p => p.productoId || p.id) || [];
       return productosVenta.some(pid => productosSeleccionados.includes(pid));
+    })
+    .filter(m => {
+      // Filtro por facturación
+      if (tipoMovimiento !== 'ventas' && tipoMovimiento !== 'todos') return true;
+      if (facturaFilter === 'facturadas') return !!m.cae;
+      if (facturaFilter === 'sinFacturar') return !m.cae;
+      return true;
     });
 
   // ==== PASO 4: Calcular resumen ====
@@ -340,6 +350,11 @@ export const ReportesPage = () => {
         Detalle: detalle,
         Monto: monto,
         'Método de Pago': m.tipoPago?.join(', ') || '-',
+        'CAE': m.cae || '-',
+        'N° Factura': m.cae ? `${String(m.facturaPtoVta || 9).padStart(4, '0')}-${String(m.facturaNumero).padStart(8, '0')}` : '-',
+        'Tipo Factura': m.facturaTipo || '-',
+        'Neto': m.cae ? m.facturaNeto : '-',
+        'IVA': m.cae ? m.facturaIva : '-',
         Usuario: m.usuarioNombre || '-'
       };
     });
@@ -356,6 +371,11 @@ export const ReportesPage = () => {
       { wch: 45 }, // Detalle
       { wch: 12 }, // Monto
       { wch: 15 }, // Método
+      { wch: 18 }, // CAE
+      { wch: 16 }, // N° Factura
+      { wch: 14 }, // Tipo Factura
+      { wch: 12 }, // Neto
+      { wch: 10 }, // IVA
       { wch: 25 }, // Usuario
     ];
     ws['!cols'] = colWidths;
@@ -468,6 +488,22 @@ export const ReportesPage = () => {
                 {METODOS_PAGO.map(m => (
                   <option key={m.id} value={m.id}>{m.nombre}</option>
                 ))}
+              </select>
+            </div>
+          )}
+
+          {/* Filtro secundario: Facturación */}
+          {(tipoMovimiento === 'ventas' || tipoMovimiento === 'todos') && (
+            <div>
+              <label className="block text-sm font-semibold mb-1">Facturación</label>
+              <select
+                value={facturaFilter}
+                onChange={(e) => setFacturaFilter(e.target.value)}
+                className="w-full border p-2 rounded"
+              >
+                <option value="todos">Todas</option>
+                <option value="facturadas">Facturadas</option>
+                <option value="sinFacturar">Sin Facturar</option>
               </select>
             </div>
           )}
