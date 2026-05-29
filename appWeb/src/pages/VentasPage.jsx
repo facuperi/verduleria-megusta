@@ -6,14 +6,9 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
-
-const METODOS_PAGO = [
-  { id: 'efectivo', nombre: 'Efectivo' },
-  { id: 'tarjeta', nombre: 'Tarjeta' },
-  { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopago', nombre: 'MercadoPago' },
-  { id: 'cuentadni', nombre: 'Cuenta DNI' },
-];
+import { BuscadorProductos } from '../components/BuscadorProductos';
+import { CarritoVentas } from '../components/CarritoVentas';
+import { imprimirTicketAFavor, imprimirTicketVenta } from '../utils/ticketPrinter';
 
 const FIREBASE_FUNCTIONS_URL = 'https://facturarventa-v7nkl2aufq-uc.a.run.app';
 const AFIP_PTO_VTA = 9;
@@ -203,148 +198,10 @@ export const VentasPage = () => {
 
   const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
 
-  const imprimirTicketAFavor = () => {
-    const monto = Math.abs(diferencia);
-    const fecha = new Date().toLocaleString('es-AR');
-    const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
-    
-    const ticket = `====================================
-      SANTOS Y SANTAS
-    ${direccion}
-    Tel: 2915245537
-==================================
-${fecha}
-───────────────────────────────────
-   NOTA DE CREDITO A FAVOR
-───────────────────────────────────
-  MONTO A FAVOR: $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-───────────────────────────────────
-  Este ticket acredita que el
-  cliente tiene saldo a favor
-  de $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-───────────────────────────────────
-  Negocio: ${(caja.sucursal || '').toUpperCase()}
-  Atendido por: ${user?.email || 'Usuario'}
-===================================
-      Gracias por su compra!
-         Vuelve pronto :)
-==================================`;
-    
-    const printWindow = window.open('', '_blank', 'width=300,height=700');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Nota de Crédito</title>
-          <style>
-            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>${ticket}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 250);
-  };
-
-const imprimirTicketVenta = () => {
-    if (!ventaExitosa || !caja) return;
-    
-    const fecha = new Date().toLocaleString('es-AR');
-    const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
-    const ventaId = ventaExitosa.id.slice(-6).toUpperCase();
-    const { neto, iva } = calcularIva(ventaExitosa.total);
-    
-    let ticket = `====================================
-      SANTOS Y SANTAS
-    ${direccion}
-    Tel: 2915245537
-===================================
-${fecha}    Vta: ${ventaId}
-───────────────────────────────────
-PRODUCTO              CANT    IMP
-───────────────────────────────────`;
-    
-    const ventasNormales = ventaExitosa.productos.filter(p => !p.esNotaCredito);
-    const notasCredito = ventaExitosa.productos.filter(p => p.esNotaCredito);
-    
-    for (const item of ventasNormales) {
-      const nombre = item.nombre.length > 18 ? item.nombre.substring(0, 16) + '..' : item.nombre.padEnd(18);
-      const importe = (item.precio * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 0 });
-      ticket += `
-${nombre} ${item.cantidad.toString().padStart(3)}  ${importe.padStart(5)}`;
-    }
-    
-    if (ventasNormales.length > 0) {
-      ticket += `
-───────────────────────────────────`;
-    }
-    
-    if (notasCredito.length > 0) {
-      ticket += `
-NOTA CRÉDITO:`;
-      for (const item of notasCredito) {
-        const nombre = item.nombre.length > 18 ? item.nombre.substring(0, 16) + '..' : item.nombre.padEnd(18);
-        const importe = (item.precio * item.cantidad).toLocaleString('es-AR', { minimumFractionDigits: 0 });
-        ticket += `
-${nombre} ${item.cantidad.toString().padStart(3)} -${importe.padStart(5)}`;
-      }
-    }
-    
-    const totalFormateado = ventaExitosa.total.toLocaleString('es-AR', { minimumFractionDigits: 0 });
-    const netoFormateado = neto.toLocaleString('es-AR', { minimumFractionDigits: 0 });
-    const ivaFormateado = iva.toLocaleString('es-AR', { minimumFractionDigits: 0 });
-    
-    ticket += `
-───────────────────────────────────
-Subtotal (neto):      $${netoFormateado.padStart(8)}
-IVA 21%:              $${ivaFormateado.padStart(8)}
-───────────────────────────────────
-TOTAL:                $${totalFormateado.padStart(8)}
-───────────────────────────────────`;
-    
-    const metodosPago = ventaExitosa.tipoPago.map(p => {
-      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', Cuentadni: 'Cuenta DNI' };
-      return nombres[p.metodo] || p.metodo;
-    }).join(', ');
-    
-    ticket += `
-PAGO: ${metodosPago}`;
-
-if (facturaData) {
-      const ptoVta = '00009';
-      const nroFactura = String(facturaData.numero).padStart(8, '0');
-      const fechaVto = facturaData.fechaVto ? `${facturaData.fechaVto.slice(6,8)}/${facturaData.fechaVto.slice(4,6)}/${facturaData.fechaVto.slice(0,4)}` : '-';
-      const tipoFacturaLabel = facturaData.tipoFactura === 'A' ? 'FACTURA A' : 'FACTURA B';
-      ticket += `
-───────────────────────────────────
-         ${tipoFacturaLabel}
- CAE: ${facturaData.cae}
- Vto: ${fechaVto}
- N°: ${ptoVta}-${nroFactura}`;
-    }
-    
-    ticket += `
-====================================
-     Gracias por su compra!
-        Vuelve pronto :)
-===================================`;
-    
-    const printWindow = window.open('', '_blank', 'width=300,height=700');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Ticket de Venta</title>
-          <style>
-            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>${ticket}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 250);
+  const cambiarTipoPrecio = (index, nuevoTipo) => {
+    setCarrito(carrito.map((p, i) =>
+      i === index ? { ...p, precioSeleccionado: nuevoTipo } : p
+    ));
   };
 
   const handleFacturarManual = async () => {
@@ -624,274 +481,60 @@ if (facturaData) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Columna 1: Búsqueda y productos */}
         <div className="md:col-span-2">
-          <div className="bg-white p-4 rounded-lg shadow mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold">Buscar producto (código de barras, código interno o nombre)</h3>
-              <button
-                onClick={() => setAgregarComoNotaCredito(!agregarComoNotaCredito)}
-                className={`px-3 py-1 rounded text-xs font-semibold border ${agregarComoNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
-              >
-                {agregarComoNotaCredito ? '⚠️ Nota Crédito' : 'Agregar como Nota Crédito'}
-              </button>
-            </div>
-            <input
-              ref={inputScannerRef}
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onKeyDown={handleScannerInput}
-              placeholder="Escaneá o escribí para buscar..."
-              className="w-full border p-2 rounded"
-            />
-            
-            {busqueda && (
-              <div className="mt-2 max-h-60 overflow-y-auto">
-                {productosFiltrados.length === 0 ? (
-                  <p className="text-gray-500">No se encontraron productos</p>
-                ) : (
-                  productosFiltrados.map(producto => (
-                    <div
-                      key={producto.id}
-                      onClick={() => agregarAlCarrito(producto)}
-                      className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-semibold">{producto.nombre}</p>
-                        <p className="text-sm text-gray-500">{producto.codigoInterno}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-green-600">EF: ${producto.precioEfectivo}</p>
-                        <p className="text-blue-600">TJ: ${producto.precioTarjeta}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {caja && (
-            <p className="text-sm text-gray-500 mb-2">Vendiendo en: <span className="font-semibold capitalize">{caja.sucursal}</span></p>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {productos
-              .filter(p => (p.stockPorNegocio?.[caja?.sucursal] || 0) > 0)
-              .map(producto => (
-                <div
-                  key={producto.id}
-                  onClick={() => agregarAlCarrito(producto)}
-                  className={`bg-white p-3 rounded-lg shadow cursor-pointer hover:bg-gray-50 ${agregarComoNotaCredito ? 'ring-2 ring-red-400' : ''}`}
-                >
-                  <h4 className="font-semibold text-sm">{producto.nombre}</h4>
-                  <p className="text-xs text-gray-500">{producto.codigoInterno}</p>
-                  <div className="mt-1 flex justify-between text-sm">
-                    <span className="text-green-600">EF: ${producto.precioEfectivo}</span>
-                    <span className="text-blue-600">TJ: ${producto.precioTarjeta}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Stock: {producto.stockPorNegocio?.[caja?.sucursal] || 0}
-                  </p>
-                </div>
-              ))}
-          </div>
+          <BuscadorProductos
+            busqueda={busqueda}
+            productosFiltrados={productosFiltrados}
+            productos={productos}
+            sucursal={caja?.sucursal}
+            agregarComoNotaCredito={agregarComoNotaCredito}
+            inputRef={inputScannerRef}
+            onBusquedaChange={setBusqueda}
+            onKeyDown={handleScannerInput}
+            onToggleNotaCredito={() => setAgregarComoNotaCredito(!agregarComoNotaCredito)}
+            onProductClick={(p) => agregarAlCarrito(p)}
+          />
         </div>
 
-        {/* Columna 2: Carrito y pagos */}
         <div>
-          <h3 className="text-xl font-bold mb-4">Carrito</h3>
-          
-          {error && (
-            <div className="bg-red-100 text-red-700 px-4 py-2 rounded mb-4">{error}</div>
-          )}
-          
-          {carrito.length === 0 ? (
-            <p className="text-gray-500">El carrito está vacío</p>
-          ) : (
-            <div className="bg-white p-4 rounded-lg shadow mb-4">
-              {carrito.map((item, index) => {
-                const precio = item.precioSeleccionado === 'tarjeta' ? item.precioTarjeta : item.precioEfectivo;
-                const cambiarTipoPrecio = (nuevoTipo) => {
-                  setCarrito(carrito.map((p, i) => 
-                    i === index ? { ...p, precioSeleccionado: nuevoTipo } : p
-                  ));
-                };
-                const itemKey = `${item.id}-${item.precioSeleccionado}`;
-                return (
-                  <div key={itemKey} className={`py-2 border-b ${item.esNotaCredito ? 'bg-red-50 -mx-4 px-4' : ''}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className={`font-semibold text-sm ${item.esNotaCredito ? 'text-red-700' : ''}`}>
-                          {item.esNotaCredito && '⚠️ '}{item.nombre}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          ${precio} x {item.cantidad}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => actualizarCantidad(item.id, item.precioSeleccionado, item.cantidad - 1)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          -
-                        </button>
-                        <span className="text-sm">{item.cantidad}</span>
-                        <button
-                          onClick={() => actualizarCantidad(item.id, item.precioSeleccionado, item.cantidad + 1)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => quitarDelCarrito(item.id, item.precioSeleccionado)}
-                        className="text-red-600 hover:text-red-800 ml-2"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <select
-                        value={item.precioSeleccionado}
-                        onChange={(e) => cambiarTipoPrecio(e.target.value)}
-                        className="text-xs border rounded px-1 py-0.5"
-                      >
-                        <option value="efectivo">Efectivo: ${item.precioEfectivo}</option>
-                        <option value="tarjeta">Tarjeta: ${item.precioTarjeta}</option>
-                      </select>
-                      <button
-                        onClick={() => toggleNotaCredito(item.id, item.precioSeleccionado)}
-                        className={`text-xs px-2 py-0.5 rounded border ${item.esNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-gray-100 text-gray-600 border-gray-300'}`}
-                      >
-                        {item.esNotaCredito ? 'Nota Crédito' : 'Venta'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              
-              <div className="mt-4 pt-4 border-t">
-                {totalNotaCredito > 0 && (
-                  <div className="text-sm mb-2">
-                    <p className="text-red-600">Nota Crédito: -${totalNotaCredito}</p>
-                    {diferencia < 0 && (
-                      <div className="flex items-center justify-between bg-green-50 p-2 rounded mt-1">
-                        <p className="text-green-700 font-semibold">A favor: $${Math.abs(diferencia)}</p>
-                        <button
-                          onClick={imprimirTicketAFavor}
-                          className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
-                        >
-                          🖨️ Imprimir Ticket
-                        </button>
-                      </div>
-                    )}
-                    {diferencia > 0 && (
-                      <p className="text-blue-600">El cliente debe pagar: ${diferencia}</p>
-                    )}
-                    {diferencia === 0 && (
-                      <p className="text-gray-600">Sin costo adicional</p>
-                    )}
-                  </div>
-                )}
-                <p className="text-xl font-bold">Total: ${total}</p>
-              </div>
-              
-              {totalNotaCredito > 0 && (
-                <div className="mt-4">
-                  <label className="block text-sm font-semibold mb-1">Observación / Motivo</label>
-                  <textarea
-                    value={observacion}
-                    onChange={(e) => setObservacion(e.target.value)}
-                    placeholder="Ej: Error de precio, cliente devolvió producto..."
-                    className="w-full border p-2 rounded text-sm"
-                    rows={2}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Métodos de pago */}
-          {carrito.length > 0 && (
-            <div className="bg-white p-4 rounded-lg shadow mb-4">
-              <h4 className="font-semibold mb-2">Métodos de Pago</h4>
-              
-              {pagosSeleccionados.map((pago, index) => (
-                <div key={index} className="flex gap-2 mb-2">
-                  <select
-                    value={pago.metodo}
-                    onChange={(e) => handlePagoChange(index, 'metodo', e.target.value)}
-                    className="border p-2 rounded text-sm"
-                  >
-                    {METODOS_PAGO.map(m => (
-                      <option key={m.id} value={m.id}>{m.nombre}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={pago.monto}
-                    onChange={(e) => handlePagoChange(index, 'monto', e.target.value)}
-                    placeholder="Monto"
-                    className="border p-2 rounded text-sm w-24"
-                  />
-                  {pagosSeleccionados.length > 1 && (
-                    <button
-                      onClick={() => quitarMetodoPago(index)}
-                      className="text-red-600"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
-              
-              <button
-                onClick={agregarMetodoPago}
-                className="text-sm text-blue-600 hover:underline mb-2"
-              >
-                + Agregar otro método
-              </button>
-
-              <div className="text-sm text-gray-500 mt-2">
-                <p>Pagado: ${totalPagos}</p>
-                {totalPagos !== total && (
-                  <p className="text-red-500">Falta: ${total - totalPagos}</p>
-                )}
-              </div>
-
-              <button
-                onClick={realizarVenta}
-                disabled={vendiendo || !caja || totalPagos !== total}
-                className="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                {vendiendo ? 'Procesando...' : 'Vender'}
-              </button>
-            </div>
-          )}
+          <CarritoVentas
+            carrito={carrito}
+            totalVenta={totalVenta}
+            totalNotaCredito={totalNotaCredito}
+            diferencia={diferencia}
+            total={total}
+            observacion={observacion}
+            pagosSeleccionados={pagosSeleccionados}
+            vendiendo={vendiendo}
+            caja={caja}
+            totalPagos={totalPagos}
+            error={error}
+            onCambiarCantidad={actualizarCantidad}
+            onQuitarDelCarrito={quitarDelCarrito}
+            onCambiarTipoPrecio={cambiarTipoPrecio}
+            onToggleNotaCredito={toggleNotaCredito}
+            onPagoChange={handlePagoChange}
+            onAgregarMetodoPago={agregarMetodoPago}
+            onQuitarMetodoPago={quitarMetodoPago}
+            onObservacionChange={setObservacion}
+            onImprimirAFavor={() => imprimirTicketAFavor(diferencia, caja, user?.email)}
+            onRealizarVenta={realizarVenta}
+          />
 
           {ventaExitosa && (
-            <div className="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+            <div className="bg-green-50 border border-green-400 text-green-700 p-4 rounded-lg shadow mb-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm">
-                  ✅ Venta #{ventaExitosa.id.slice(-6).toUpperCase()} - Total: <span className="font-bold">${ventaExitosa.total.toLocaleString('es-AR')}</span>
-                </span>
-                <button 
-                  onClick={imprimirTicketVenta} 
-                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                <div>
+                  <p className="font-bold">✅ Venta exitosa</p>
+                  <p className="text-sm">Total: ${ventaExitosa.total}</p>
+                </div>
+                <button
+                  onClick={() => imprimirTicketVenta(ventaExitosa, caja, facturaData)}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
                 >
                   🖨️ Imprimir Ticket
                 </button>
               </div>
-              {facturaData && (
-                <div className="mt-2 text-sm bg-white border border-green-300 rounded p-2">
-                  <span className="font-semibold">📄 {facturaData.tipoFactura === 'A' ? 'Factura A' : 'Factura B'}</span>
-                  <span className="ml-2">CAE: {facturaData.cae}</span>
-                  <span className="ml-2">N°: 00009-{String(facturaData.numero).padStart(8, '0')}</span>
-                </div>
-              )}
               {!facturaData && !facturando && (
                 <div className="mt-2 flex gap-2">
                   <button
@@ -916,7 +559,6 @@ if (facturaData) {
         </div>
       </div>
 
-      {/* Modal para ingresar CUIT */}
       {mostrarModalFactura && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
