@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useDevice } from '../hooks/useDevice';
 
@@ -43,19 +43,19 @@ export const Layout = ({ children }) => {
                   <div className="flex flex-col md:flex-row md:space-x-4 space-y-2 md:space-y-0">
                     {!isMobile && (
                       <>
-                        <a href="/ventas" className="px-3 py-2 rounded hover:bg-indigo-700">Ventas</a>
-                        <a href="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</a>
+                        <Link to="/ventas" className="px-3 py-2 rounded hover:bg-indigo-700">Ventas</Link>
+                        <Link to="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</Link>
                       </>
                     )}
                     {isMobile && (
-                      <a href="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</a>
+                      <Link to="/stock" className="px-3 py-2 rounded hover:bg-indigo-700">Stock</Link>
                     )}
-                    <a href="/caja" className="px-3 py-2 rounded hover:bg-indigo-700">Caja</a>
+                    <Link to="/caja" className="px-3 py-2 rounded hover:bg-indigo-700">Caja</Link>
                     {!isMobile && userRole === 'gerente' && (
                       <>
-                        <a href="/movimientos" className="px-3 py-2 rounded hover:bg-indigo-700">Movimientos</a>
-                        <a href="/reportes" className="px-3 py-2 rounded hover:bg-indigo-700">Reportes</a>
-                        <a href="/usuarios" className="px-3 py-2 rounded hover:bg-indigo-700">Usuarios</a>
+                        <Link to="/movimientos" className="px-3 py-2 rounded hover:bg-indigo-700">Movimientos</Link>
+                        <Link to="/reportes" className="px-3 py-2 rounded hover:bg-indigo-700">Reportes</Link>
+                        <Link to="/usuarios" className="px-3 py-2 rounded hover:bg-indigo-700">Usuarios</Link>
                       </>
                     )}
                     <button onClick={() => setShowLogoutModal(true)} className="px-3 py-2 rounded hover:bg-indigo-700 text-left">
