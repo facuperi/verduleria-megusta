@@ -110,13 +110,20 @@ export const VentasPage = () => {
         const productosSnapshot = await getDocs(collection(db, 'productos'));
         setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         
-        // Verificar caja abierta
-        const cajaQuery = query(collection(db, 'caja'), where('estado', '==', 'abierta'));
+        // Verificar caja abierta del usuario
+        if (!user) {
+          setCaja(null);
+          setLoading(false);
+          return;
+        }
+        const cajaQuery = query(collection(db, 'caja'), where('estado', '==', 'abierta'), where('abiertoPor', '==', user.uid));
         const cajaSnapshot = await getDocs(cajaQuery);
         
         if (!cajaSnapshot.empty) {
           const cajaData = { id: cajaSnapshot.docs[0].id, ...cajaSnapshot.docs[0].data() };
           setCaja(cajaData);
+        } else {
+          setCaja(null);
         }
       } catch (err) {
         setError('Error al cargar datos');
@@ -125,7 +132,7 @@ export const VentasPage = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [user]);
 
   // Focus en input de scanner
   useEffect(() => {

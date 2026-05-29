@@ -31,14 +31,14 @@ const METODOS_PAGO = [
 ];
 
 export const CajaPage = () => {
-  const { user, isGerente } = useAuth();
+  const { user, isGerente, selectedNegocio, setSelectedNegocio, clearSelectedNegocio } = useAuth();
   const { isMobile } = useDevice();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [caja, setCaja] = useState(null);
   const [ventasHoy, setVentasHoy] = useState([]);
   const [retiros, setRetiros] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [procesando, setProcesando] = useState(false);
   
   // Modal de cierre de caja
@@ -59,7 +59,6 @@ export const CajaPage = () => {
   const [iconoNuevoTipo, setIconoNuevoTipo] = useState('💰');
   
   // Campos del formulario
-  const [negocioSeleccionado, setNegocioSeleccionado] = useState('');
   const [saldoApertura, setSaldoApertura] = useState('');
   const [saldoCierre, setSaldoCierre] = useState('');
 
@@ -73,18 +72,30 @@ export const CajaPage = () => {
   const canAccess = !isMobile;
 
   useEffect(() => {
+    if (!user) {
+      setCaja(null);
+      setVentasHoy([]);
+      setRetiros([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchCaja = async () => {
+      setLoading(true);
       try {
         const cajaQuery = query(
           collection(db, 'caja'),
-          where('estado', '==', 'abierta')
+          where('estado', '==', 'abierta'),
+          where('abiertoPor', '==', user.uid)
         );
         const cajaSnapshot = await getDocs(cajaQuery);
         
         if (!cajaSnapshot.empty) {
           const cajaData = { id: cajaSnapshot.docs[0].id, ...cajaSnapshot.docs[0].data() };
           setCaja(cajaData);
-          setNegocioSeleccionado(cajaData.sucursal);
+          if (cajaData.sucursal && cajaData.sucursal !== selectedNegocio) {
+            setSelectedNegocio(cajaData.sucursal);
+          }
           
           // Traer ventas de hoy para esta caja
           const ventasSnapshot = await getDocs(collection(db, 'ventas'));
@@ -108,6 +119,10 @@ export const CajaPage = () => {
           const tiposSnapshot = await getDocs(collection(db, 'tiposRetiro'));
           const tiposPersonalizados = tiposSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setTiposRetiroPersonalizados(tiposPersonalizados);
+        } else {
+          setCaja(null);
+          setVentasHoy([]);
+          setRetiros([]);
         }
       } catch (err) {
         console.error(err);
@@ -116,19 +131,28 @@ export const CajaPage = () => {
       }
     };
     fetchCaja();
-  }, []);
+  }, [user]);
 
   const abrirCaja = async () => {
-    if (!negocioSeleccionado) {
-      alert('Seleccioná un negocio');
-      return;
-    }
+    if (!selectedNegocio) return;
     setProcesando(true);
     try {
+      const yaAbierta = await getDocs(query(
+        collection(db, 'caja'),
+        where('estado', '==', 'abierta'),
+        where('abiertoPor', '==', user.uid)
+      ));
+      if (!yaAbierta.empty) {
+        const existente = yaAbierta.docs[0].data();
+        showToast(`Ya tenés una caja abierta en ${existente.sucursal || 'otra sucursal'}`, 'error');
+        setProcesando(false);
+        return;
+      }
+
       const ahora = new Date();
       const docRef = await addDoc(collection(db, 'caja'), {
         estado: 'abierta',
-        sucursal: negocioSeleccionado,
+        sucursal: selectedNegocio,
         saldoApertura: parseFloat(saldoApertura) || 0,
         montoEfectivo: parseFloat(saldoApertura) || 0,
         abiertoPor: user.uid,
@@ -144,7 +168,7 @@ export const CajaPage = () => {
       setCaja({ 
         id: docRef.id, 
         estado: 'abierta', 
-        sucursal: negocioSeleccionado,
+        sucursal: selectedNegocio,
         saldoApertura: parseFloat(saldoApertura) || 0,
         montoEfectivo: parseFloat(saldoApertura) || 0,
       });
@@ -241,6 +265,7 @@ export const CajaPage = () => {
       setSaldoCierre('');
       setVentasHoy([]);
       setMostrarModalCierre(false);
+      clearSelectedNegocio();
       
       if (imprimir) {
         setTimeout(() => imprimirTicketCierre(), 300);
@@ -563,46 +588,65 @@ ${fechaCierre}    ${sucursalNombre}
     <Layout>
       <h2 className="text-2xl font-bold mb-6">Gestión de Caja</h2>
 
-      {!caja ? (
-        <div className="bg-white p-6 rounded-lg shadow max-w-md">
-          <h3 className="text-xl font-semibold mb-4">Apertura de Caja</h3>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-1">Seleccionar Negocio</label>
-            <select
-              value={negocioSeleccionado}
-              onChange={(e) => setNegocioSeleccionado(e.target.value)}
-              className="w-full border p-2 rounded"
-              required
+      {selectedNegocio === null ? (
+        <div className="max-w-lg mx-auto">
+          <h3 className="text-xl font-semibold mb-6 text-center">¿En qué negocio estás?</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => setSelectedNegocio('chiclana')}
+              className="bg-white p-8 rounded-xl shadow hover:shadow-lg hover:bg-indigo-50 transition-all border-2 border-transparent hover:border-indigo-300"
             >
-              <option value="">-- Seleccionar --</option>
-              {NEGOCIOS.map(n => (
-                <option key={n.id} value={n.id}>{n.nombre}</option>
-              ))}
-            </select>
+              <span className="text-4xl block mb-3">🏪</span>
+              <span className="text-lg font-bold">Chiclana</span>
+              <span className="text-sm text-gray-500 block mt-1">Chiclana 115</span>
+            </button>
+            <button
+              onClick={() => setSelectedNegocio('belgrano')}
+              className="bg-white p-8 rounded-xl shadow hover:shadow-lg hover:bg-indigo-50 transition-all border-2 border-transparent hover:border-indigo-300"
+            >
+              <span className="text-4xl block mb-3">🏪</span>
+              <span className="text-lg font-bold">Belgrano</span>
+              <span className="text-sm text-gray-500 block mt-1">Belgrano 84</span>
+            </button>
           </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-1">Saldo de Apertura (Efectivo)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={saldoApertura}
-              onChange={(e) => setSaldoApertura(e.target.value)}
-              className="w-full border p-2 rounded"
-              placeholder="0.00"
-            />
-          </div>
-
-          <button
-            onClick={abrirCaja}
-            disabled={procesando || !negocioSeleccionado || !saldoApertura}
-            className="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
-          >
-            {procesando ? 'Procesando...' : 'Abrir Caja'}
-          </button>
         </div>
-) : (
+      ) : !caja ? (
+        <div className="max-w-md mx-auto">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Apertura de Caja</h3>
+              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium capitalize">{selectedNegocio}</span>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1">Saldo de Apertura (Efectivo)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={saldoApertura}
+                onChange={(e) => setSaldoApertura(e.target.value)}
+                className="w-full border p-2 rounded"
+                placeholder="0.00"
+              />
+            </div>
+
+            <button
+              onClick={abrirCaja}
+              disabled={procesando || !saldoApertura}
+              className="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 mb-3"
+            >
+              {procesando ? 'Procesando...' : 'Abrir Caja'}
+            </button>
+
+            <button
+              onClick={clearSelectedNegocio}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
+            >
+              ← Cambiar de negocio
+            </button>
+          </div>
+        </div>
+      ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
