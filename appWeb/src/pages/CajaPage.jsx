@@ -127,7 +127,8 @@ export const CajaPage = () => {
           setRetiros([]);
         }
       } catch (err) {
-        console.error(err);
+        console.error('Error al cargar caja:', err);
+        showToast('Error al cargar datos de caja. Revisá la consola (F12).', 'error');
       } finally {
         setLoading(false);
       }
