@@ -79,6 +79,13 @@ export const CajaPage = () => {
       setLoading(false);
       return;
     }
+    if (!selectedNegocio) {
+      setCaja(null);
+      setVentasHoy([]);
+      setRetiros([]);
+      setLoading(false);
+      return;
+    }
 
     const fetchCaja = async () => {
       setLoading(true);
@@ -86,18 +93,14 @@ export const CajaPage = () => {
         const cajaQuery = query(
           collection(db, 'caja'),
           where('estado', '==', 'abierta'),
-          where('abiertoPor', '==', user.uid)
+          where('sucursal', '==', selectedNegocio)
         );
         const cajaSnapshot = await getDocs(cajaQuery);
         
         if (!cajaSnapshot.empty) {
           const cajaData = { id: cajaSnapshot.docs[0].id, ...cajaSnapshot.docs[0].data() };
           setCaja(cajaData);
-          if (cajaData.sucursal && cajaData.sucursal !== selectedNegocio) {
-            setSelectedNegocio(cajaData.sucursal);
-          }
           
-          // Traer ventas de hoy para esta caja
           const fechaApertura = new Date(cajaData.fecha);
           const ventasQuery = query(
             collection(db, 'ventas'),
@@ -105,22 +108,17 @@ export const CajaPage = () => {
             where('negocio', '==', cajaData.sucursal)
           );
           const ventasSnapshot = await getDocs(ventasQuery);
-          const ventasDelTurno = ventasSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setVentasHoy(ventasDelTurno);
+          setVentasHoy(ventasSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
           
-          // Traer retiros de esta caja
           const retirosQuery = query(
             collection(db, 'retirosCaja'),
             where('cajaId', '==', cajaData.id)
           );
           const retirosSnapshot = await getDocs(retirosQuery);
-          const retirosDelTurno = retirosSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setRetiros(retirosDelTurno);
+          setRetiros(retirosSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
           
-          // Traer tipos de retiro personalizados
           const tiposSnapshot = await getDocs(collection(db, 'tiposRetiro'));
-          const tiposPersonalizados = tiposSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setTiposRetiroPersonalizados(tiposPersonalizados);
+          setTiposRetiroPersonalizados(tiposSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
         } else {
           setCaja(null);
           setVentasHoy([]);
@@ -128,13 +126,13 @@ export const CajaPage = () => {
         }
       } catch (err) {
         console.error('Error al cargar caja:', err);
-        showToast('Error al cargar datos de caja. Revisá la consola (F12).', 'error');
+        showToast('Error al cargar datos de caja.', 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchCaja();
-  }, [user]);
+  }, [user, selectedNegocio]);
 
   const abrirCaja = async () => {
     if (!selectedNegocio) return;
@@ -143,11 +141,12 @@ export const CajaPage = () => {
       const yaAbierta = await getDocs(query(
         collection(db, 'caja'),
         where('estado', '==', 'abierta'),
-        where('abiertoPor', '==', user.uid)
+        where('sucursal', '==', selectedNegocio)
       ));
       if (!yaAbierta.empty) {
-        const existente = yaAbierta.docs[0].data();
-        showToast(`Ya tenés una caja abierta en ${existente.sucursal || 'otra sucursal'}`, 'error');
+        const existente = { id: yaAbierta.docs[0].id, ...yaAbierta.docs[0].data() };
+        setCaja(existente);
+        showToast(`Conectado a caja abierta en ${selectedNegocio}`, 'success');
         setProcesando(false);
         return;
       }
@@ -665,6 +664,14 @@ ${fechaCierre}    ${sucursalNombre}
         </div>
       ) : (
         <div className="space-y-6">
+          <div className="flex justify-end">
+            <button
+              onClick={clearSelectedNegocio}
+              className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+            >
+              ← Cambiar de negocio
+            </button>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
               <div className="flex justify-between items-center mb-4">

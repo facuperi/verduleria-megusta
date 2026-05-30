@@ -48,7 +48,7 @@ const facturarVenta = async (ventaId, total, tipoFactura, documentoCliente) => {
 };
 
 export const VentasPage = () => {
-  const { user } = useAuth();
+  const { user, selectedNegocio } = useAuth();
   const { isMobile } = useDevice();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -110,13 +110,13 @@ export const VentasPage = () => {
         const productosSnapshot = await getDocs(collection(db, 'productos'));
         setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         
-        // Verificar caja abierta del usuario
-        if (!user) {
+        // Verificar caja abierta del negocio
+        if (!user || !selectedNegocio) {
           setCaja(null);
           setLoading(false);
           return;
         }
-        const cajaQuery = query(collection(db, 'caja'), where('estado', '==', 'abierta'), where('abiertoPor', '==', user.uid));
+        const cajaQuery = query(collection(db, 'caja'), where('estado', '==', 'abierta'), where('sucursal', '==', selectedNegocio));
         const cajaSnapshot = await getDocs(cajaQuery);
         
         if (!cajaSnapshot.empty) {
