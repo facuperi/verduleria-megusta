@@ -1,26 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { Layout } from '../components/Layout';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        navigate('/ventas');
-      }
-    });
-    return unsubscribe;
-  }, [navigate]);
+    if (!authLoading && user) {
+      navigate('/ventas');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
