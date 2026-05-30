@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { Layout } from '../components/Layout';
@@ -12,7 +12,6 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tieneUsuarios, setTieneUsuarios] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -22,19 +21,6 @@ export const LoginPage = () => {
     });
     return unsubscribe;
   }, [navigate]);
-
-  useEffect(() => {
-    const verificar = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, 'users'));
-        setTieneUsuarios(snapshot.size > 0);
-      } catch (err) {
-        console.error('Error:', err);
-        setTieneUsuarios(false);
-      }
-    };
-    verificar();
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,12 +68,6 @@ export const LoginPage = () => {
       <div className="flex items-center justify-center min-h-[80vh]">
         <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
           <h1 className="text-2xl font-bold text-center mb-6">Iniciar Sesión</h1>
-          
-          {!tieneUsuarios && (
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4">
-              No hay usuarios. Сrea el primero.
-            </div>
-          )}
           
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">

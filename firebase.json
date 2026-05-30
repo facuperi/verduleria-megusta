@@ -1,6 +1,9 @@
 {
   "functions": [
-    {
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
       "source": "functions",
       "runtime": "nodejs20",
       "ignore": [

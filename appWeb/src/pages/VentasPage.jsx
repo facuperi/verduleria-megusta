@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
@@ -26,9 +26,14 @@ const necesitaFacturaAuto = (tiposPago) => {
 
 const facturarVenta = async (ventaId, total, tipoFactura, documentoCliente) => {
   try {
+    const user = auth.currentUser;
+    const token = user ? await user.getIdToken() : null;
     const response = await fetch(FIREBASE_FUNCTIONS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
       body: JSON.stringify({ ventaId, total, tipoFactura, documentoCliente })
     });
     if (!response.ok) {

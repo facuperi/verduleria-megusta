@@ -1,6 +1,5 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const fetch = require('node-fetch');
 
 admin.initializeApp();
 
@@ -133,7 +132,7 @@ exports.facturarVenta = functions.https.onRequest({
 }, async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).send('');
@@ -144,6 +143,18 @@ exports.facturarVenta = functions.https.onRequest({
   }
 
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Token de autenticación requerido' });
+    }
+    let uid;
+    try {
+      const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      uid = decoded.uid;
+    } catch (e) {
+      return res.status(401).json({ error: 'Token inválido o expirado' });
+    }
+
     const { ventaId, total, tipoFactura, documentoCliente } = req.body;
 
     if (!ventaId || !total) {

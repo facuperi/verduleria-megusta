@@ -60,8 +60,8 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/ventas" element={<VentasPage />} />
-              <Route path="/stock" element={<StockPage />} />
+              <Route path="/ventas" element={<PrivateRoute><VentasPage /></PrivateRoute>} />
+              <Route path="/stock" element={<PrivateRoute><StockPage /></PrivateRoute>} />
               <Route path="/movimientos" element={
                 <PrivateRoute requiredRole="gerente">
                   <MovimientosPage />
