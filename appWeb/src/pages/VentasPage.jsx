@@ -439,7 +439,11 @@ export const VentasPage = () => {
       showToast('Venta realizada con éxito', 'success');
     } catch (err) {
       console.error(err);
-      setError('Error al realizar venta');
+      if (err.code === 'permission-denied') {
+        setError('La caja fue cerrada en otro dispositivo. Recargá la página.');
+      } else {
+        setError('Error al realizar venta');
+      }
     } finally {
       setVendiendo(false);
     }

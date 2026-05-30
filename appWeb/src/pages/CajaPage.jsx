@@ -275,7 +275,10 @@ export const CajaPage = () => {
       }
     } catch (err) {
       console.error(err);
-      alert('Error al cerrar caja');
+      const msg = err.code === 'permission-denied'
+        ? 'La caja fue cerrada en otro dispositivo. Recargá la página.'
+        : 'Error al cerrar caja';
+      showToast(msg, 'error');
     } finally {
       setProcesando(false);
     }
@@ -339,7 +342,10 @@ export const CajaPage = () => {
       showToast('Retiro registrado con éxito', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Error al registrar retiro', 'error');
+      const msg = err.code === 'permission-denied'
+        ? 'La caja fue cerrada en otro dispositivo. Recargá la página.'
+        : 'Error al registrar retiro';
+      showToast(msg, 'error');
     } finally {
       setProcesando(false);
     }
@@ -497,7 +503,10 @@ ${fechaCierre}    ${sucursalNombre}
       showToast('Venta modificada correctamente', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Error al modificar venta', 'error');
+      const msg = err.code === 'permission-denied'
+        ? 'La caja fue cerrada en otro dispositivo. Recargá la página.'
+        : 'Error al modificar venta';
+      showToast(msg, 'error');
     } finally {
       setProcesando(false);
     }
@@ -567,7 +576,10 @@ ${fechaCierre}    ${sucursalNombre}
       showToast('Venta eliminada y stock restaurado', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Error al eliminar venta', 'error');
+      const msg = err.code === 'permission-denied'
+        ? 'La caja fue cerrada en otro dispositivo. Recargá la página.'
+        : 'Error al eliminar venta';
+      showToast(msg, 'error');
     } finally {
       setProcesando(false);
     }

@@ -28,7 +28,9 @@ service cloud.firestore {
     match /caja/{cajaId} {
       allow read: if isAuth();
       allow create: if isAuth();
-      allow update: if isAuth() && resource.data.abiertoPor == request.auth.uid;
+      allow update: if isAuth()
+        && resource.data.abiertoPor == request.auth.uid
+        && resource.data.estado == 'abierta';
       allow delete: if false;
     }
 
