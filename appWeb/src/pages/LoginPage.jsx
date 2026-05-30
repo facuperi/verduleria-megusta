@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
@@ -14,11 +14,9 @@ export const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      navigate('/ventas');
-    }
-  }, [user, authLoading, navigate]);
+  if (!authLoading && user) {
+    return <Navigate to="/ventas" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
