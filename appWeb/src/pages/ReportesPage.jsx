@@ -330,15 +330,26 @@ export const ReportesPage = () => {
   // ==== PASO 4: Calcular resumen ====
   const ventasNormales = movimientosFiltrados
     .filter(m => m.origen === 'ventas' && m.tipoVenta !== 'notaCredito' && !(m.tipoVenta === 'mixta' && m.diferencia < 0))
-    .reduce((sum, m) => sum + (m.diferencia > 0 ? m.diferencia : m.total), 0);
+    .reduce((sum, m) => sum + (m.total || m.diferencia || 0), 0);
 
   const notasCredito = movimientosFiltrados
     .filter(m => m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0))
-    .reduce((sum, m) => sum + Math.abs(m.diferencia || m.total), 0);
+    .reduce((sum, m) => sum + Math.abs(m.total || m.diferencia || 0), 0);
 
   const retirosTotal = movimientosFiltrados
     .filter(m => m.origen === 'retiros')
     .reduce((sum, m) => sum + m.monto, 0);
+
+  const totalDescuentos = movimientosFiltrados
+    .filter(m => m.origen === 'ventas')
+    .reduce((sum, m) => {
+      if (!m.pagos) return sum;
+      const base = m.diferencia > 0 ? m.diferencia : m.total || 0;
+      return sum + m.pagos.reduce((s, p) => {
+        if (!p.descuentoTipo || !p.descuentoValor) return s;
+        return s + (p.descuentoTipo === 'porcentaje' ? base * p.descuentoValor / 100 : p.descuentoValor);
+      }, 0);
+    }, 0);
 
   const balance = ventasNormales - notasCredito - retirosTotal;
 
@@ -495,7 +506,7 @@ export const ReportesPage = () => {
       />
 
       {movimientosFiltrados.length > 0 && (
-        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} retirosTotal={retirosTotal} balance={balance} />
+        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} retirosTotal={retirosTotal} totalDescuentos={totalDescuentos} balance={balance} />
       )}
 
       {movimientosFiltrados.length > 0 && (

@@ -192,28 +192,28 @@ export const CajaPage = () => {
     const ventasNormales = ventasHoy.filter(v => v.tipoVenta === 'normal' || v.tipoVenta === 'mixta');
     const notasCredito = ventasHoy.filter(v => v.tipoVenta === 'notaCredito' || v.totalNotaCredito > 0);
     
-    const montoVentasNormales = ventasNormales.reduce((sum, v) => sum + (v.totalVenta || v.total), 0);
+    const montoVentasNormales = ventasNormales.reduce((sum, v) => sum + (v.total || v.totalVenta), 0);
     const montoNotasCredito = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
     
     const ventasEfectivo = ventasNormales
       .filter(v => v.tipoPago?.includes('efectivo'))
-      .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+      .reduce((sum, v) => sum + (v.total || v.diferencia || 0), 0);
     
     const ventasTarjeta = ventasNormales
       .filter(v => v.tipoPago?.includes('tarjeta'))
-      .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+      .reduce((sum, v) => sum + (v.total || v.diferencia || 0), 0);
     
     const ventasDebito = ventasNormales
       .filter(v => v.tipoPago?.includes('debito'))
-      .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+      .reduce((sum, v) => sum + (v.total || v.diferencia || 0), 0);
     
     const ventasMercadoPago = ventasNormales
       .filter(v => v.tipoPago?.includes('mercadopago'))
-      .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+      .reduce((sum, v) => sum + (v.total || v.diferencia || 0), 0);
     
     const ventasCuentaDNI = ventasNormales
       .filter(v => v.tipoPago?.includes('cuentadni'))
-      .reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+      .reduce((sum, v) => sum + (v.total || v.diferencia || 0), 0);
     
     const notasCreditoEfectivo = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
     const totalRetiros = retiros.reduce((sum, r) => sum + r.monto, 0);
@@ -224,6 +224,15 @@ export const CajaPage = () => {
     const efectivoCaja = (caja?.saldoApertura || 0) + ventasEfectivo - totalRetiros;
     const saldoSistema = efectivoCaja;
     const diferencia = (parseFloat(saldoCierre) || 0) - saldoSistema;
+
+    const totalDescuentos = ventasHoy.reduce((sum, v) => {
+      if (!v.pagos) return sum;
+      const base = v.diferencia > 0 ? v.diferencia : v.total || 0;
+      return sum + v.pagos.reduce((s, p) => {
+        if (!p.descuentoTipo || !p.descuentoValor) return s;
+        return s + (p.descuentoTipo === 'porcentaje' ? base * p.descuentoValor / 100 : p.descuentoValor);
+      }, 0);
+    }, 0);
 
     return { 
       ventasEfectivo, 
@@ -239,7 +248,8 @@ export const CajaPage = () => {
       diferencia,
       montoVentasNormales,
       montoNotasCredito,
-      totalRetiros
+      totalRetiros,
+      totalDescuentos,
     };
   };
 
@@ -247,7 +257,7 @@ export const CajaPage = () => {
     setProcesando(true);
     try {
       const ahora = new Date();
-      const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia } = calcularVentas();
+      const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, totalDescuentos } = calcularVentas();
       
       await updateDoc(doc(db, 'caja', caja.id), {
         estado: 'cerrada',
@@ -259,6 +269,7 @@ export const CajaPage = () => {
         ventasBrutas,
         notaCreditoTotal,
         ventaNeta,
+        totalDescuentos,
         efectivoCaja,
         saldoSistema,
         saldoCierre: parseFloat(saldoCierre) || 0,
@@ -415,12 +426,13 @@ ${fechaCierre}    ${sucursalNombre}
  APERTURA: ${fechaApertura}
  CIERRE:   ${fechaCierre}
 ───────────────────────────────────
- RESUMEN:
- Ventas Brutas:   $${formatMonto(ventasBrutas)}
- Notas Credito:   -$${formatMonto(notaCreditoTotal)}
- VENTA NETA:      $${formatMonto(ventaNeta)}
+  RESUMEN:
+  Ventas Brutas:   $${formatMonto(ventasBrutas)}
+  Notas Credito:   -$${formatMonto(notaCreditoTotal)}
+  VENTA NETA:      $${formatMonto(ventaNeta)}
+  Descuentos:      -$${formatMonto(totalDescuentos)}
 ───────────────────────────────────
- X METODO DE PAGO:
+  X METODO DE PAGO:
  Efectivo:       $${formatMonto(ventasEfectivo)}
  Tarjeta:        $${formatMonto(ventasTarjeta)}
  Debito:         $${formatMonto(ventasDebito)}
@@ -603,7 +615,7 @@ ${fechaCierre}    ${sucursalNombre}
     );
   }
 
-  const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, montoVentasNormales, montoNotasCredito } = calcularVentas();
+  const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, totalDescuentos, montoVentasNormales, montoNotasCredito } = calcularVentas();
 
   return (
     <Layout>

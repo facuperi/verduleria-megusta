@@ -16,10 +16,26 @@ import { EmptyState } from '../components/EmptyState';
 const FIREBASE_FUNCTIONS_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL;
 const AFIP_PTO_VTA = parseInt(import.meta.env.VITE_AFIP_PTO_VTA) || 9;
 
+const METODOS_PAGO = [
+  { id: 'efectivo', nombre: 'Efectivo' },
+  { id: 'tarjeta', nombre: 'Tarjeta' },
+  { id: 'debito', nombre: 'Débito' },
+  { id: 'mercadopago', nombre: 'MercadoPago' },
+  { id: 'cuentadni', nombre: 'Cuenta DNI' },
+];
+
 const calcularIva = (total) => {
   const neto = Math.round(total / 1.21 * 100) / 100;
   const iva = Math.round((total - neto) * 100) / 100;
   return { neto, iva };
+};
+
+const calcularDescuento = (pago, totalBase = 0) => {
+  if (!pago.descuentoTipo || !pago.descuentoValor) return 0;
+  const valor = parseFloat(pago.descuentoValor) || 0;
+  if (pago.descuentoTipo === 'porcentaje') return totalBase * valor / 100;
+  if (pago.descuentoTipo === 'fijo') return valor;
+  return 0;
 };
 
 const necesitaFacturaAuto = (tiposPago) => {
@@ -74,7 +90,7 @@ export const VentasPage = () => {
   const [cuitCliente, setCuitCliente] = useState('');
   
   // Métodos de pago seleccionados
-  const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0 }]);
+  const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
   
   const inputScannerRef = useRef(null);
 
@@ -95,11 +111,14 @@ export const VentasPage = () => {
   const diferencia = totalVenta - totalNotaCredito;
   const total = Math.max(0, diferencia);
 
+  const totalDescuentos = pagosSeleccionados.reduce((sum, p) => sum + calcularDescuento(p, diferencia), 0);
+  const totalConDescuento = Math.max(0, diferencia - totalDescuentos);
+
   useEffect(() => {
     if (carrito.length > 0 && diferencia > 0) {
-      setPagosSeleccionados([{ metodo: 'efectivo', monto: diferencia }]);
+      setPagosSeleccionados([{ metodo: 'efectivo', monto: diferencia, descuentoTipo: null, descuentoValor: 0 }]);
     } else if (carrito.length > 0 && diferencia <= 0) {
-      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
+      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
     }
   }, [carrito.length, diferencia]);
   
@@ -187,19 +206,67 @@ export const VentasPage = () => {
     ));
   };
 
+  const autoAjustarMontos = (pagos) => {
+    const sumMontos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
+    const descs = pagos.reduce((sum, p) => sum + calcularDescuento(p, diferencia), 0);
+    const nuevoTotalConDesc = Math.max(0, diferencia - descs);
+    const restante = Math.round((nuevoTotalConDesc - sumMontos) * 100) / 100;
+
+    if (Math.abs(restante) < 0.01) return false;
+
+    const actual = parseFloat(pagos[0]?.monto) || 0;
+    const nuevo = Math.max(0, actual + restante);
+    if (nuevo !== actual) {
+      pagos[0] = { ...pagos[0], monto: Math.round(nuevo * 100) / 100 };
+      return true;
+    }
+    return false;
+  };
+
   const handlePagoChange = (index, campo, valor) => {
     const nuevosPagos = [...pagosSeleccionados];
-    nuevosPagos[index][campo] = valor;
+    if (campo === 'metodo') {
+      const yaExiste = nuevosPagos.some((p, i) => i !== index && p.metodo === valor);
+      if (yaExiste) return;
+    }
+    nuevosPagos[index] = { ...nuevosPagos[index], [campo]: valor };
+    if (campo === 'descuentoValor') {
+      autoAjustarMontos(nuevosPagos);
+    }
+    setPagosSeleccionados(nuevosPagos);
+  };
+
+  const handleDescuentoTipo = (index, tipo) => {
+    const nuevosPagos = [...pagosSeleccionados];
+    const actual = nuevosPagos[index].descuentoTipo;
+    nuevosPagos[index] = {
+      ...nuevosPagos[index],
+      descuentoTipo: actual === tipo ? null : tipo,
+      descuentoValor: actual === tipo ? 0 : nuevosPagos[index].descuentoValor,
+    };
+    autoAjustarMontos(nuevosPagos);
+    setPagosSeleccionados(nuevosPagos);
+  };
+
+  const handleMontoBlur = (index) => {
+    const nuevosPagos = [...pagosSeleccionados];
+    autoAjustarMontos(nuevosPagos);
     setPagosSeleccionados(nuevosPagos);
   };
 
   const agregarMetodoPago = () => {
-    setPagosSeleccionados([...pagosSeleccionados, { metodo: 'efectivo', monto: 0 }]);
+    const metodosExistentes = pagosSeleccionados.map(p => p.metodo);
+    const primerDisponible = METODOS_PAGO.find(m => !metodosExistentes.includes(m.id));
+    if (!primerDisponible) return;
+    const nuevosPagos = [...pagosSeleccionados, { metodo: primerDisponible.id, monto: 0, descuentoTipo: null, descuentoValor: 0 }];
+    autoAjustarMontos(nuevosPagos);
+    setPagosSeleccionados(nuevosPagos);
   };
 
   const quitarMetodoPago = (index) => {
     if (pagosSeleccionados.length > 1) {
       const nuevosPagos = pagosSeleccionados.filter((_, i) => i !== index);
+      autoAjustarMontos(nuevosPagos);
       setPagosSeleccionados(nuevosPagos);
     }
   };
@@ -288,8 +355,8 @@ export const VentasPage = () => {
     }
     if (carrito.length === 0) return;
     
-    if (diferencia > 0 && totalPagos !== diferencia) {
-      setError(`El total de los pagos debe ser igual a $${diferencia}`);
+    if (diferencia > 0 && totalPagos !== totalConDescuento) {
+      setError(`El total de los pagos debe ser igual a $${totalConDescuento}`);
       return;
     }
     if (diferencia <= 0 && totalPagos !== 0) {
@@ -325,13 +392,23 @@ export const VentasPage = () => {
       const ventaDoc = await addDoc(collection(db, 'ventas'), {
         negocio: caja.sucursal,
         productos: productosVenta,
-        total,
+        total: totalConDescuento,
         totalVenta,
         totalNotaCredito,
         diferencia,
         tipoVenta,
         observacion: observacion || null,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
+        pagos: pagosSeleccionados.map(p => {
+          const desc = calcularDescuento(p, diferencia);
+          return {
+            metodo: p.metodo,
+            monto: parseFloat(p.monto) || 0,
+            descuentoTipo: desc > 0 ? p.descuentoTipo : null,
+            descuentoValor: desc > 0 ? (parseFloat(p.descuentoValor) || 0) : 0,
+            montoReal: parseFloat(p.monto) || 0,
+          };
+        }),
         facturada: false,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
@@ -360,10 +437,11 @@ export const VentasPage = () => {
 
       // Actualizar caja - ventas por método
       const updateData = {};
+      let totalDescuentosCaja = 0;
       for (const pago of pagosSeleccionados) {
-        if (pago.monto > 0) {
-          const campo = `ventas${pago.metodo.charAt(0).toUpperCase() + pago.metodo.slice(1)}`;
-          // Convertir primera letra mayúscula pero mantener el formato del campo
+        const monto = parseFloat(pago.monto) || 0;
+        totalDescuentosCaja += calcularDescuento(pago, diferencia);
+        if (monto > 0) {
           const campoKey = {
             'efectivo': 'ventasEfectivo',
             'tarjeta': 'ventasTarjeta',
@@ -372,12 +450,15 @@ export const VentasPage = () => {
             'cuentadni': 'ventasCuentaDNI',
           }[pago.metodo];
           
-          updateData[campoKey] = (caja[campoKey] || 0) + parseFloat(pago.monto);
+          updateData[campoKey] = (caja[campoKey] || 0) + monto;
           
           if (pago.metodo === 'efectivo') {
-            updateData.montoEfectivo = (caja.montoEfectivo || 0) + parseFloat(pago.monto);
+            updateData.montoEfectivo = (caja.montoEfectivo || 0) + monto;
           }
         }
+      }
+      if (totalDescuentosCaja > 0) {
+        updateData.totalDescuentos = (caja.totalDescuentos || 0) + totalDescuentosCaja;
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -389,16 +470,27 @@ export const VentasPage = () => {
       setProductos(productosActualizados.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       
       setCarrito([]);
-      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0 }]);
+      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
       setObservacion('');
       setFacturaData(null);
       setAgregarComoNotaCredito(false);
       
+      const pagosConDescuento = pagosSeleccionados.map(p => {
+        const desc = calcularDescuento(p, diferencia);
+        return {
+          metodo: p.metodo,
+          monto: parseFloat(p.monto) || 0,
+          descuentoTipo: desc > 0 ? p.descuentoTipo : null,
+          descuentoValor: desc > 0 ? (parseFloat(p.descuentoValor) || 0) : 0,
+          montoReal: parseFloat(p.monto) || 0,
+        };
+      });
       const nuevaVenta = {
         id: ventaDoc.id,
-        total,
+        total: totalConDescuento,
         productos: productosVenta,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
+        pagos: pagosConDescuento,
         tipoVenta,
         negocio: caja.sucursal,
       };
@@ -520,12 +612,16 @@ export const VentasPage = () => {
             vendiendo={vendiendo}
             caja={caja}
             totalPagos={totalPagos}
+            totalDescuentos={totalDescuentos}
+            totalConDescuento={totalConDescuento}
             error={error}
             onCambiarCantidad={actualizarCantidad}
             onQuitarDelCarrito={quitarDelCarrito}
             onCambiarTipoPrecio={cambiarTipoPrecio}
             onToggleNotaCredito={toggleNotaCredito}
             onPagoChange={handlePagoChange}
+            onDescuentoTipo={handleDescuentoTipo}
+            onMontoBlur={handleMontoBlur}
             onAgregarMetodoPago={agregarMetodoPago}
             onQuitarMetodoPago={quitarMetodoPago}
             onObservacionChange={setObservacion}

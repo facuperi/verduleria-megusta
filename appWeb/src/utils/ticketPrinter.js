@@ -83,17 +83,18 @@ ${fechaCierre}    ${sucursalNombre}
  APERTURA: ${fechaApertura}
  CIERRE:   ${fechaCierre}
 ───────────────────────────────────
- RESUMEN:
- Ventas Brutas:   $${formatMonto(caja.ventasBrutas)}
- Notas Credito:   -$${formatMonto(caja.notaCreditoTotal)}
- VENTA NETA:      $${formatMonto(caja.ventaNeta)}
+  RESUMEN:
+  Ventas Brutas:   $${formatMonto(caja.ventasBrutas)}
+  Notas Credito:   -$${formatMonto(caja.notaCreditoTotal)}
+  VENTA NETA:      $${formatMonto(caja.ventaNeta)}
+  Descuentos:      -$${formatMonto(caja.totalDescuentos || 0)}
 ───────────────────────────────────
- X METODO DE PAGO:
- Efectivo:       $${formatMonto(caja.ventasEfectivo)}
- Tarjeta:        $${formatMonto(caja.ventasTarjeta)}
- Debito:         $${formatMonto(caja.ventasDebito)}
- MercadoPago:    $${formatMonto(caja.ventasMercadoPago)}
- Cuenta DNI:     $${formatMonto(caja.ventasCuentaDNI)}
+  X METODO DE PAGO:
+  Efectivo:       $${formatMonto(caja.ventasEfectivo)}
+  Tarjeta:        $${formatMonto(caja.ventasTarjeta)}
+  Debito:         $${formatMonto(caja.ventasDebito)}
+  MercadoPago:    $${formatMonto(caja.ventasMercadoPago)}
+  Cuenta DNI:     $${formatMonto(caja.ventasCuentaDNI)}
 ───────────────────────────────────
   SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
   SALDO CIERRE:   $${formatMonto(caja.saldoCierre)}
@@ -191,13 +192,29 @@ IVA 21%:              $${ivaFormateado.padStart(8)}
 TOTAL:                $${totalFormateado.padStart(8)}
 ───────────────────────────────────`;
 
-  const metodosPago = ventaExitosa.tipoPago.map(p => {
-    const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
-    return nombres[p] || p;
-  }).join(', ');
-
   ticket += `
-PAGO: ${metodosPago}`;
+ PAGOS:`;
+  if (ventaExitosa.pagos && ventaExitosa.pagos.length > 0) {
+    for (const p of ventaExitosa.pagos) {
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
+      const nombre = (nombres[p.metodo] || p.metodo).padEnd(10);
+      const montoReal = p.montoReal || 0;
+      const desc = (p.monto || 0) - montoReal;
+      if (desc > 0) {
+        ticket += `
+ ${nombre} $${montoReal.toLocaleString('es-AR').padStart(8)} (-${p.descuentoTipo === 'porcentaje' ? p.descuentoValor + '%' : '$' + p.descuentoValor.toLocaleString('es-AR')})`;
+      } else {
+        ticket += `
+ ${nombre} $${(p.monto || 0).toLocaleString('es-AR').padStart(8)}`;
+      }
+    }
+  } else {
+    for (const metodo of ventaExitosa.tipoPago) {
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
+      ticket += `
+ ${(nombres[metodo] || metodo).padEnd(10)}`;
+    }
+  }
 
   if (facturaData) {
     const ptoVta = '00009';

@@ -39,7 +39,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                 const esNotaCredito = m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
                 tipo = esNotaCredito ? 'Nota Crédito' : 'Venta';
                 detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(', ');
-                monto = m.diferencia > 0 ? m.diferencia : m.total;
+                monto = m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0);
                 colorFila = esNotaCredito ? 'bg-red-50' : 'bg-green-50';
               } else if (m.origen === 'retiros') {
                 const tipoFijo = TIPOS_RETIRO_FIJOS.find(t => t.id === m.tipo);
@@ -125,6 +125,30 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                               ))}
                             </tbody>
                           </table>
+                        )}
+                        {m.origen === 'ventas' && m.pagos && (
+                          <div className="mt-2">
+                            <p className="font-semibold mb-1">Métodos de pago:</p>
+                            {m.pagos.map((pg, idx) => {
+                              const tieneDesc = pg.descuentoTipo && pg.descuentoValor > 0;
+                              const descEtiqueta = tieneDesc
+                                ? (pg.descuentoTipo === 'porcentaje'
+                                  ? `${pg.descuentoValor}%`
+                                  : `$${pg.descuentoValor.toLocaleString('es-AR')}`)
+                                : null;
+                              const descValor = tieneDesc
+                                ? (pg.descuentoTipo === 'porcentaje'
+                                  ? (m.diferencia || m.total || 0) * pg.descuentoValor / 100
+                                  : pg.descuentoValor)
+                                : 0;
+                              return (
+                                <p key={idx} className="text-xs ml-2">
+                                  {pg.metodo}: ${(pg.monto || 0).toLocaleString('es-AR')}
+                                  {descValor > 0 && <span className="text-green-600"> ({descEtiqueta} desc s/$${(m.diferencia || m.total || 0).toLocaleString('es-AR')})</span>}
+                                </p>
+                              );
+                            })}
+                          </div>
                         )}
                         {m.origen === 'retiros' && (
                           <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${m.monto} | <strong>Obs:</strong> {m.observacion || '-'}</p>

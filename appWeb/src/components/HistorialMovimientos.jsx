@@ -46,9 +46,9 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
 
               const esNotaCredito = item.tipoVenta === 'notaCredito' || (item.tipoVenta === 'mixta' && item.diferencia < 0);
               const esMixta = item.tipoVenta === 'mixta';
-              const montoMostrar = item.diferencia !== undefined
-                ? (item.diferencia < 0 ? Math.abs(item.diferencia) : item.diferencia)
-                : item.total;
+              const montoMostrar = item.total !== undefined
+                ? item.total
+                : (item.diferencia !== undefined ? Math.abs(item.diferencia) : 0);
               const tipoLabel = esNotaCredito
                 ? (esMixta ? 'Mixta (NC)' : 'Nota Crédito')
                 : (esMixta ? 'Mixta' : 'Venta');
@@ -69,11 +69,19 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
                     {esNotaCredito && <span className="text-red-500 mr-1">-</span>}
                     ${montoMostrar.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                   </td>
-                  <td className="py-2 capitalize text-gray-600">
+                  <td className="py-2 text-gray-600">
                     {item.tipoPago?.map(p => {
                       const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP', cuentadni: 'DNI' };
                       return nombres[p] || p;
                     }).join(', ') || '-'}
+                    {(() => {
+                      const base = item.diferencia > 0 ? item.diferencia : item.total || 0;
+                      const descTotal = item.pagos?.reduce((s, pg) => {
+                        if (!pg.descuentoTipo || !pg.descuentoValor) return s;
+                        return s + (pg.descuentoTipo === 'porcentaje' ? base * pg.descuentoValor / 100 : pg.descuentoValor);
+                      }, 0) || 0;
+                      return descTotal > 0 ? <span className="text-green-600 text-xs ml-1">(Desc: -${descTotal.toLocaleString('es-AR')})</span> : null;
+                    })()}
                   </td>
                   <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
                   {isGerente && (

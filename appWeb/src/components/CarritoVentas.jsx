@@ -8,6 +8,14 @@ const METODOS_PAGO = [
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
+const calcularDescuento = (pago, totalBase = 0) => {
+  if (!pago.descuentoTipo || !pago.descuentoValor) return 0;
+  const valor = parseFloat(pago.descuentoValor) || 0;
+  if (pago.descuentoTipo === 'porcentaje') return totalBase * valor / 100;
+  if (pago.descuentoTipo === 'fijo') return valor;
+  return 0;
+};
+
 export const CarritoVentas = ({
   carrito,
   totalVenta,
@@ -19,12 +27,16 @@ export const CarritoVentas = ({
   vendiendo,
   caja,
   totalPagos,
+  totalDescuentos,
+  totalConDescuento,
   error,
   onCambiarCantidad,
   onQuitarDelCarrito,
   onCambiarTipoPrecio,
   onToggleNotaCredito,
   onPagoChange,
+  onDescuentoTipo,
+  onMontoBlur,
   onAgregarMetodoPago,
   onQuitarMetodoPago,
   onObservacionChange,
@@ -143,29 +155,61 @@ export const CarritoVentas = ({
       {carrito.length > 0 && (
         <div className="bg-white p-4 rounded-lg shadow mb-4">
           <h4 className="font-semibold mb-2">Métodos de Pago</h4>
-          {pagosSeleccionados.map((pago, idx) => (
-            <div key={idx} className="flex gap-2 mb-2 items-center">
-              <select
-                value={pago.metodo}
-                onChange={(e) => onPagoChange(idx, 'metodo', e.target.value)}
-                className="flex-1 border rounded p-2 text-sm"
-              >
-                {METODOS_PAGO.map(m => (
-                  <option key={m.id} value={m.id}>{m.nombre}</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                value={pago.monto}
-                onChange={(e) => onPagoChange(idx, 'monto', e.target.value)}
-                className="w-28 border rounded p-2 text-sm text-right"
-                placeholder="0"
-              />
-              {pagosSeleccionados.length > 1 && (
-                <button onClick={() => onQuitarMetodoPago(idx)} className="text-red-500 hover:text-red-700">✕</button>
-              )}
-            </div>
-          ))}
+          {pagosSeleccionados.map((pago, idx) => {
+            const desc = calcularDescuento(pago, diferencia);
+            const montoReal = Math.max(0, (parseFloat(pago.monto) || 0) - desc);
+            return (
+              <div key={idx} className="flex gap-1 mb-2 items-center flex-wrap">
+                <select
+                  value={pago.metodo}
+                  onChange={(e) => onPagoChange(idx, 'metodo', e.target.value)}
+                  className="flex-1 min-w-[100px] border rounded p-2 text-sm"
+                >
+                  {METODOS_PAGO.map(m => (
+                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={pago.monto}
+                  onChange={(e) => onPagoChange(idx, 'monto', e.target.value)}
+                  onBlur={() => onMontoBlur(idx)}
+                  className="w-20 border rounded p-2 text-sm text-right"
+                  placeholder="0"
+                />
+                <input
+                  type="number"
+                  value={pago.descuentoValor}
+                  onChange={(e) => onPagoChange(idx, 'descuentoValor', e.target.value)}
+                  className={`w-16 border rounded p-2 text-sm text-right ${!pago.descuentoTipo ? 'opacity-40' : ''}`}
+                  placeholder="0"
+                  disabled={!pago.descuentoTipo}
+                />
+                <button
+                  onClick={() => onDescuentoTipo(idx, 'porcentaje')}
+                  className={`px-2 py-2 text-sm font-bold rounded border ${pago.descuentoTipo === 'porcentaje' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-600 border-gray-300'}`}
+                  title="Descuento porcentual"
+                >
+                  %
+                </button>
+                <button
+                  onClick={() => onDescuentoTipo(idx, 'fijo')}
+                  className={`px-2 py-2 text-sm font-bold rounded border ${pago.descuentoTipo === 'fijo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-600 border-gray-300'}`}
+                  title="Descuento fijo en $"
+                >
+                  $D
+                </button>
+                {pago.descuentoTipo && desc > 0 && (
+                  <span className="text-xs text-green-700 font-semibold whitespace-nowrap">
+                    ${montoReal.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                  </span>
+                )}
+                {pagosSeleccionados.length > 1 && (
+                  <button onClick={() => onQuitarMetodoPago(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                )}
+              </div>
+            );
+          })}
           <button
             onClick={onAgregarMetodoPago}
             disabled={pagosSeleccionados.length >= METODOS_PAGO.length}
@@ -177,13 +221,17 @@ export const CarritoVentas = ({
           <div className="flex items-center justify-between mt-4 pt-4 border-t">
             <div>
               <p className="text-sm">Total: ${totalVenta.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
-              <p className={`text-sm font-semibold ${totalPagos === total ? 'text-green-600' : 'text-red-600'}`}>
+              {totalDescuentos > 0 && (
+                <p className="text-sm text-green-700">Descuentos: -${totalDescuentos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+              )}
+              <p className="text-sm font-semibold">Total a pagar: ${totalConDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+              <p className={`text-sm ${totalPagos === totalConDescuento ? 'text-green-600' : 'text-red-600'}`}>
                 Pagos: ${totalPagos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
               </p>
             </div>
             <button
               onClick={onRealizarVenta}
-              disabled={vendiendo || !caja || totalPagos !== total}
+              disabled={vendiendo || !caja || totalPagos !== totalConDescuento}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
             >
               {vendiendo ? 'Vendiendo...' : '💵 Vender'}
