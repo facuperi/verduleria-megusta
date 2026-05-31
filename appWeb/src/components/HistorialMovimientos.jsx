@@ -1,3 +1,5 @@
+import { EmptyState } from './EmptyState';
+
 export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETIRO_FIJOS, tiposRetiroPersonalizados, handleOpenEdit, handleEliminarVenta, ventasBrutas, notaCreditoTotal, efectivoCaja }) => {
   if (ventasHoy.length === 0) {
     return <EmptyState title="No hay movimientos aún" />;

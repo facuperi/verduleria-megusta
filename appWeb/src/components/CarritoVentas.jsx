@@ -1,3 +1,5 @@
+import { EmptyState } from './EmptyState';
+
 const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
@@ -5,8 +7,6 @@ const METODOS_PAGO = [
   { id: 'mercadopago', nombre: 'MercadoPago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
-
-import { EmptyState } from './EmptyState';
 
 export const CarritoVentas = ({
   carrito,
