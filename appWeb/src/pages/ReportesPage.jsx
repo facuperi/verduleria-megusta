@@ -384,7 +384,7 @@ export const ReportesPage = () => {
         const esNotaCredito = m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
         tipo = esNotaCredito ? 'Nota Crédito' : 'Venta';
         detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(', ');
-        monto = m.diferencia > 0 ? m.diferencia : m.total;
+        monto = m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0);
       } else if (m.origen === 'retiros') {
         // Determinar nombre del tipo: si es fijo usar mapeo, si es personalizado buscar en Firestore
         let nombreTipo = m.tipo;
