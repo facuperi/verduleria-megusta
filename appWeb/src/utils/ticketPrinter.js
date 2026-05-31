@@ -1,7 +1,15 @@
-const getDireccion = (sucursal) => {
+export const TELEFONO = '2915245537';
+
+export const getDireccion = (sucursal) => {
   if (sucursal === 'chiclana') return 'Chiclana 115';
   if (sucursal === 'belgrano') return 'Belgrano 84';
   return sucursal;
+};
+
+export const getSucursalNombre = (sucursal) => {
+  if (sucursal === 'chiclana') return 'CHICLANA';
+  if (sucursal === 'belgrano') return 'BELGRANO';
+  return (sucursal || '').toUpperCase();
 };
 
 export const imprimirTicketAFavor = (diferencia, caja, userEmail) => {
@@ -12,7 +20,7 @@ export const imprimirTicketAFavor = (diferencia, caja, userEmail) => {
   const ticket = `====================================
       SANTOS Y SANTAS
     ${direccion}
-    Tel: 2915245537
+    Tel: ${TELEFONO}
 ==================================
 ${fecha}
 ───────────────────────────────────
@@ -54,6 +62,79 @@ const calcularIva = (total) => {
   return { neto, iva };
 };
 
+export const imprimirTicketCajaCerrada = (caja) => {
+  try {
+    if (!caja || caja.estado !== 'cerrada') return;
+
+    const formatMonto = (monto) => (monto || 0).toLocaleString('es-AR').padStart(8);
+    const direccion = getDireccion(caja.sucursal);
+    const sucursalNombre = getSucursalNombre(caja.sucursal);
+    const fechaApertura = caja.fecha ? new Date(caja.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+    const fechaCierre = caja.horaCierre ? new Date(caja.horaCierre).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+
+    const ticket = `====================================
+      SANTOS Y SANTAS
+    ${direccion}
+    Tel: ${TELEFONO}
+===================================
+     CIERRE DE CAJA
+${fechaCierre}    ${sucursalNombre}
+───────────────────────────────────
+ APERTURA: ${fechaApertura}
+ CIERRE:   ${fechaCierre}
+───────────────────────────────────
+ RESUMEN:
+ Ventas Brutas:   $${formatMonto(caja.ventasBrutas)}
+ Notas Credito:   -$${formatMonto(caja.notaCreditoTotal)}
+ VENTA NETA:      $${formatMonto(caja.ventaNeta)}
+───────────────────────────────────
+ X METODO DE PAGO:
+ Efectivo:       $${formatMonto(caja.ventasEfectivo)}
+ Tarjeta:        $${formatMonto(caja.ventasTarjeta)}
+ Debito:         $${formatMonto(caja.ventasDebito)}
+ MercadoPago:    $${formatMonto(caja.ventasMercadoPago)}
+ Cuenta DNI:     $${formatMonto(caja.ventasCuentaDNI)}
+───────────────────────────────────
+  SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
+  SALDO CIERRE:   $${formatMonto(caja.saldoCierre)}
+  SALDO SISTEMA:  $${formatMonto(caja.saldoSistema)}
+───────────────────────────────────
+  DIFERENCIA:     $${formatMonto(caja.diferencia)}
+===================================
+ FIRMA CAJERO:
+
+
+───────────────────────────────────
+ OBSERVACIONES: 
+
+
+
+===================================`;
+
+    const printWindow = window.open('', '_blank', 'width=300,height=700');
+    if (!printWindow) {
+      console.error('Popup bloqueado. Permití popups para este sitio.');
+      return;
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Cierre de Caja</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>${ticket}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 250);
+  } catch (err) {
+    console.error('Error al imprimir ticket de cierre:', err);
+  }
+};
+
 export const imprimirTicketVenta = (ventaExitosa, caja, facturaData) => {
   if (!ventaExitosa || !caja) return;
 
@@ -65,7 +146,7 @@ export const imprimirTicketVenta = (ventaExitosa, caja, facturaData) => {
   let ticket = `====================================
       SANTOS Y SANTAS
     ${direccion}
-    Tel: 2915245537
+    Tel: ${TELEFONO}
 ===================================
 ${fecha}    Vta: ${ventaId}
 ───────────────────────────────────

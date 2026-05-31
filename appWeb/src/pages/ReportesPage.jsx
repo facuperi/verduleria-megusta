@@ -6,40 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
-
-const TIPOS_RETIRO = [
-  { id: 'cajaRoja', nombre: 'Caja roja', icono: '💰' },
-  { id: 'gasto', nombre: 'Gasto', icono: '🧹' },
-  { id: 'retiroCaro', nombre: 'Retiro Caro', icono: '👔' },
-  { id: 'retiroFede', nombre: 'Retiro Fede', icono: '👔' },
-  { id: 'errorMP', nombre: 'Error MP', icono: '⚠️' },
-  { id: 'errorDNI', nombre: 'Error DNI', icono: '⚠️' },
-  { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
-];
-
-const TIPOS_MOVIMIENTO = [
-  { id: 'todos', nombre: 'Todos' },
-  { id: 'ventas', nombre: 'Ventas' },
-  { id: 'notasCredito', nombre: 'Notas de Crédito' },
-  { id: 'retiros', nombre: 'Retiros' },
-  { id: 'apertura', nombre: 'Apertura de Caja' },
-  { id: 'cierre', nombre: 'Cierre de Caja' },
-];
-
-const NEGOCIOS = [
-  { id: 'todos', nombre: 'Todos' },
-  { id: 'chiclana', nombre: 'Chiclana' },
-  { id: 'belgrano', nombre: 'Belgrano' },
-];
-
-const METODOS_PAGO = [
-  { id: 'todos', nombre: 'Todos' },
-  { id: 'efectivo', nombre: 'Efectivo' },
-  { id: 'tarjeta', nombre: 'Tarjeta' },
-  { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopago', nombre: 'MercadoPago' },
-  { id: 'cuentadni', nombre: 'Cuenta DNI' },
-];
+import { FiltrosReportes } from '../components/FiltrosReportes';
+import { ResumenReportes } from '../components/ResumenReportes';
+import { TablaReportes } from '../components/TablaReportes';
+import { imprimirTicketCajaCerrada } from '../utils/ticketPrinter';
 
 export const ReportesPage = () => {
   const { isGerente } = useAuth();
@@ -58,6 +28,8 @@ export const ReportesPage = () => {
   const [filasExpandidas, setFilasExpandidas] = useState({});
   const [retirosPendientes, setRetirosPendientes] = useState(0);
   const [migrando, setMigrando] = useState(false);
+  const [migrandoCajas, setMigrandoCajas] = useState(false);
+  const [cajasPendientes, setCajasPendientes] = useState(0);
   const [tiposRetiroPersonalizados, setTiposRetiroPersonalizados] = useState({});
   const [productos, setProductos] = useState([]);
   const [productosSeleccionados, setProductosSeleccionados] = useState([]);
@@ -110,6 +82,80 @@ export const ReportesPage = () => {
     }
   };
 
+  // ==== Migrar cajas viejas (backfill ventasBrutas, etc) ====
+  const migrarCajas = async () => {
+    setMigrandoCajas(true);
+    try {
+      const cajaSnapshot = await getDocs(collection(db, 'caja'));
+      const cajas = cajaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const cajasViejas = cajas.filter(c => c.estado === 'cerrada' && !c.ventasBrutas && c.ventasBrutas !== 0);
+
+      if (cajasViejas.length === 0) {
+        showToast('No hay cajas para migrar', 'info');
+        setMigrandoCajas(false);
+        return;
+      }
+
+      let actualizadas = 0;
+      for (const caja of cajasViejas) {
+        const apertura = caja.fecha ? new Date(caja.fecha) : null;
+        const cierre = caja.horaCierre ? new Date(caja.horaCierre) : (apertura ? new Date(apertura.getTime() + 86400000) : null);
+        if (!apertura || !cierre) continue;
+
+        const ventasSnapshot = await getDocs(collection(db, 'ventas'));
+        const ventas = ventasSnapshot.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(v => {
+            const vFecha = v.fecha?.toDate ? v.fecha.toDate() : new Date(v.fecha);
+            return vFecha >= apertura && vFecha <= cierre && (v.negocio === caja.sucursal);
+          });
+
+        const ventasNormales = ventas.filter(v => v.tipoVenta === 'normal' || v.tipoVenta === 'mixta');
+        const notasCredito = ventas.filter(v => v.tipoVenta === 'notaCredito' || v.totalNotaCredito > 0);
+
+        const montoVentasNormales = ventasNormales.reduce((sum, v) => sum + (v.totalVenta || v.total), 0);
+        const montoNotasCredito = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
+
+        const ventasEfectivo = ventasNormales.filter(v => v.tipoPago?.includes('efectivo')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+        const ventasTarjeta = ventasNormales.filter(v => v.tipoPago?.includes('tarjeta')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+        const ventasDebito = ventasNormales.filter(v => v.tipoPago?.includes('debito')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+        const ventasMercadoPago = ventasNormales.filter(v => v.tipoPago?.includes('mercadopago')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+        const ventasCuentaDNI = ventasNormales.filter(v => v.tipoPago?.includes('cuentadni')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+
+        const ventaNeta = montoVentasNormales - montoNotasCredito;
+        const retirosSnapshot = await getDocs(collection(db, 'retirosCaja'));
+        const retiros = retirosSnapshot.docs.map(d => d.data()).filter(r => r.cajaId === caja.id);
+        const totalRetiros = retiros.reduce((sum, r) => sum + r.monto, 0);
+        const efectivoCaja = (caja.saldoApertura || 0) + ventasEfectivo - totalRetiros;
+        const saldoSistema = efectivoCaja;
+        const diferencia = (caja.saldoCierre || 0) - saldoSistema;
+
+        await updateDoc(doc(db, 'caja', caja.id), {
+          ventasBrutas: montoVentasNormales,
+          notaCreditoTotal: montoNotasCredito,
+          ventaNeta,
+          ventasEfectivo,
+          ventasTarjeta,
+          ventasDebito,
+          ventasMercadoPago,
+          ventasCuentaDNI,
+          efectivoCaja,
+          saldoSistema,
+          diferencia,
+        });
+        actualizadas++;
+      }
+
+      showToast(`Se actualizaron ${actualizadas} cajas`, 'success');
+      setCajasPendientes(0);
+    } catch (err) {
+      console.error('Error al migrar cajas:', err);
+      showToast('Error al migrar cajas', 'error');
+    } finally {
+      setMigrandoCajas(false);
+    }
+  };
+
   // ==== Verificar retiros pendientes al inicio ====
   useEffect(() => {
     const verificarRetiros = async () => {
@@ -120,6 +166,13 @@ export const ReportesPage = () => {
 
       const productosSnapshot = await getDocs(collection(db, 'productos'));
       setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      const cajaSnapshot = await getDocs(collection(db, 'caja'));
+      const cajasSinDatos = cajaSnapshot.docs
+        .map(doc => doc.data())
+        .filter(c => c.estado === 'cerrada' && !c.ventasBrutas && c.ventasBrutas !== 0)
+        .length;
+      setCajasPendientes(cajasSinDatos);
     };
     if (canAccess) {
       verificarRetiros();
@@ -402,383 +455,50 @@ export const ReportesPage = () => {
     <Layout>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Reportes</h2>
-        {retirosPendientes > 0 && (
-          <button
-            onClick={migrarRetiros}
-            disabled={migrando}
-            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 text-sm disabled:opacity-50"
-          >
-            {migrando ? 'Migrando...' : `⚠️ Actualizar ${retirosPendientes} retiros old`}
-          </button>
-        )}
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-sm font-semibold mb-1">Desde</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="w-full border p-2 rounded"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Hasta</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="w-full border p-2 rounded"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Negocio</label>
-            <select
-              value={negocio}
-              onChange={(e) => setNegocio(e.target.value)}
-              className="w-full border p-2 rounded"
-            >
-              {NEGOCIOS.map(n => (
-                <option key={n.id} value={n.id}>{n.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Tipo Movimiento</label>
-            <select
-              value={tipoMovimiento}
-              onChange={(e) => setTipoMovimiento(e.target.value)}
-              className="w-full border p-2 rounded"
-            >
-              {TIPOS_MOVIMIENTO.map(t => (
-                <option key={t.id} value={t.id}>{t.nombre}</option>
-              ))}
-            </select>
-          </div>
-          
-          {/* Filtro secundario: Tipo de retiro */}
-          {tipoMovimiento === 'retiros' && (
-            <div>
-              <label className="block text-sm font-semibold mb-1">Tipo Retiro</label>
-              <select
-                value={tipoRetiro}
-                onChange={(e) => setTipoRetiro(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
-                <option value="todos">Todos</option>
-                {TIPOS_RETIRO.map(t => (
-                  <option key={t.id} value={t.id}>{t.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          
-          {/* Filtro secundario: Método de pago */}
-          {(tipoMovimiento === 'ventas' || tipoMovimiento === 'todos') && (
-            <div>
-              <label className="block text-sm font-semibold mb-1">Método Pago</label>
-              <select
-                value={metodoPago}
-                onChange={(e) => setMetodoPago(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
-                {METODOS_PAGO.map(m => (
-                  <option key={m.id} value={m.id}>{m.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Filtro secundario: Facturación */}
-          {(tipoMovimiento === 'ventas' || tipoMovimiento === 'todos') && (
-            <div>
-              <label className="block text-sm font-semibold mb-1">Facturación</label>
-              <select
-                value={facturaFilter}
-                onChange={(e) => setFacturaFilter(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
-                <option value="todos">Todas</option>
-                <option value="facturadas">Facturadas</option>
-                <option value="sinFacturar">Sin Facturar</option>
-              </select>
-            </div>
-          )}
-
-          {/* Filtro secundario: Productos (solo para ventas) */}
-          {tipoMovimiento === 'ventas' && (
-            <div className="md:col-span-2 relative">
-              <label className="block text-sm font-semibold mb-1">
-                Productos {productosSeleccionados.length > 0 && `(${productosSeleccionados.length} seleccionados)`}
-              </label>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={busquedaProducto}
-                    onChange={(e) => setBusquedaProducto(e.target.value)}
-                    onFocus={() => setMostrarSelectorProductos(true)}
-                    placeholder={productosSeleccionados.length > 0 ? `${productosSeleccionados.length} productos seleccionados` : "Buscar por código o nombre..."}
-                    className="w-full border p-2 rounded"
-                  />
-                  {mostrarSelectorProductos && (
-                    <div className="absolute z-10 mt-1 bg-white border rounded shadow-lg max-h-64 overflow-y-auto w-full left-0">
-                      <div className="p-2 bg-gray-100 sticky top-0 flex justify-between items-center">
-                        <span className="text-xs text-gray-600">Productos disponibles</span>
-                        <button
-                          onClick={() => setMostrarSelectorProductos(false)}
-                          className="text-gray-500 hover:text-gray-700 text-lg"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="p-2">
-                        <input
-                          type="text"
-                          value={busquedaProducto}
-                          onChange={(e) => setBusquedaProducto(e.target.value)}
-                          placeholder="Buscar producto..."
-                          className="w-full border p-1 rounded text-sm mb-2"
-                          autoFocus
-                        />
-                        {productos
-                          .filter(p => 
-                            p.nombre?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-                            p.codigoInterno?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-                            p.codigoBarras?.toLowerCase().includes(busquedaProducto.toLowerCase())
-                          )
-                          .map(producto => (
-                            <label
-                              key={producto.id}
-                              className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={productosSeleccionados.includes(producto.id)}
-                                onChange={() => toggleProducto(producto.id)}
-                                className="rounded"
-                              />
-                              <span className="text-xs text-gray-500 w-16">{producto.codigoInterno}</span>
-                              <span className="text-sm truncate">{producto.nombre}</span>
-                            </label>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {productosSeleccionados.length > 0 && (
-                  <button
-                    onClick={limpiarProductos}
-                    className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
-                  >
-                    Limpiar
-                  </button>
-                )}
-              </div>
-
-              {productosSeleccionados.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {productosSeleccionados.map(id => {
-                    const prod = productos.find(p => p.id === id);
-                    return prod ? (
-                      <span
-                        key={id}
-                        className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs"
-                      >
-                        {prod.codigoInterno}
-                        <button
-                          onClick={() => toggleProducto(id)}
-                          className="text-indigo-500 hover:text-indigo-700"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={cargarMovimientos}
-            disabled={loading}
-            className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {loading ? 'Cargando...' : 'Buscar'}
-          </button>
-          {movimientosFiltrados.length > 0 && (
+        <div className="flex gap-2">
+          {retirosPendientes > 0 && (
             <button
-              onClick={exportarExcel}
-              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+              onClick={migrarRetiros}
+              disabled={migrando}
+              className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 text-sm disabled:opacity-50"
             >
-              📊 Exportar Excel
+              {migrando ? 'Migrando...' : `⚠️ Actualizar ${retirosPendientes} retiros old`}
+            </button>
+          )}
+          {cajasPendientes > 0 && (
+            <button
+              onClick={migrarCajas}
+              disabled={migrandoCajas}
+              className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 text-sm disabled:opacity-50"
+            >
+              {migrandoCajas ? 'Migrando...' : `⚠️ Actualizar ${cajasPendientes} cajas old`}
             </button>
           )}
         </div>
       </div>
 
-      {/* ==== RESUMEN (Paso 4) ==== */}
+      <FiltrosReportes
+        fechaDesde={fechaDesde} setFechaDesde={setFechaDesde}
+        fechaHasta={fechaHasta} setFechaHasta={setFechaHasta}
+        negocio={negocio} setNegocio={setNegocio}
+        tipoMovimiento={tipoMovimiento} setTipoMovimiento={setTipoMovimiento}
+        tipoRetiro={tipoRetiro} setTipoRetiro={setTipoRetiro}
+        metodoPago={metodoPago} setMetodoPago={setMetodoPago}
+        facturaFilter={facturaFilter} setFacturaFilter={setFacturaFilter}
+        productosSeleccionados={productosSeleccionados} toggleProducto={toggleProducto} limpiarProductos={limpiarProductos}
+        busquedaProducto={busquedaProducto} setBusquedaProducto={setBusquedaProducto}
+        mostrarSelectorProductos={mostrarSelectorProductos} setMostrarSelectorProductos={setMostrarSelectorProductos}
+        productos={productos}
+        cargarMovimientos={cargarMovimientos} loading={loading}
+        movimientosFiltrados={movimientosFiltrados} exportarExcel={exportarExcel}
+      />
+
       {movimientosFiltrados.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <p className="text-sm text-green-700">Ventas Normales</p>
-            <p className="text-2xl font-bold text-green-600">${ventasNormales.toLocaleString('es-AR')}</p>
-          </div>
-          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-            <p className="text-sm text-red-700">Notas de Crédito</p>
-            <p className="text-2xl font-bold text-red-600">-${notasCredito.toLocaleString('es-AR')}</p>
-          </div>
-          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-            <p className="text-sm text-orange-700">Retiros</p>
-            <p className="text-2xl font-bold text-orange-600">-${retirosTotal.toLocaleString('es-AR')}</p>
-          </div>
-          <div className={`p-4 rounded-lg border ${balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-            <p className="text-sm text-gray-700">Balance Neto</p>
-            <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-gray-600'}`}>
-              ${balance.toLocaleString('es-AR')}
-            </p>
-          </div>
-        </div>
+        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} retirosTotal={retirosTotal} balance={balance} />
       )}
 
-      {/* Resultados */}
       {movimientosFiltrados.length > 0 && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-4 py-2 text-left">Fecha</th>
-                  <th className="px-4 py-2 text-left">Hora</th>
-                  <th className="px-4 py-2 text-left">Tipo</th>
-                  <th className="px-4 py-2 text-left">Negocio</th>
-                  <th className="px-4 py-2 text-left">Detalle</th>
-                  <th className="px-4 py-2 text-right">Monto</th>
-                  <th className="px-4 py-2 text-left">Método</th>
-                  <th className="px-4 py-2 text-left">Usuario</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimientosFiltrados.map(m => {
-                  let tipo = '';
-                  let detalle = '';
-                  let monto = 0;
-                  let colorFila = '';
-
-                  if (m.origen === 'ventas') {
-                    const esNotaCredito = m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
-                    tipo = esNotaCredito ? 'Nota Crédito' : 'Venta';
-                    detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(', ');
-                    monto = m.diferencia > 0 ? m.diferencia : m.total;
-                    colorFila = esNotaCredito ? 'bg-red-50' : 'bg-green-50';
-                  } else if (m.origen === 'retiros') {
-                    // Buscar nombre e icono del tipo de retiro
-                    const tipoFijo = TIPOS_RETIRO.find(t => t.id === m.tipo);
-                    const tipoPersonalizado = tiposRetiroPersonalizados[m.tipo];
-                    let nombreTipo = '';
-                    let iconoRetiro = '💸';
-                    if (tipoFijo) {
-                      nombreTipo = tipoFijo.nombre;
-                      iconoRetiro = tipoFijo.icono;
-                    } else if (tipoPersonalizado) {
-                      nombreTipo = tipoPersonalizado.nombre;
-                      iconoRetiro = tipoPersonalizado.icono || '💸';
-                    } else {
-                      // Fallback si no se encuentra
-                      nombreTipo = m.tipo.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                    }
-                    tipo = `${iconoRetiro} ${nombreTipo}`;
-                    detalle = m.observacion || '-';
-                    monto = -m.monto;
-                    colorFila = 'bg-orange-50';
-                  } else {
-                    tipo = m.estado === 'abierta' ? 'Apertura' : 'Cierre';
-                    detalle = `Saldo: $${m.saldoApertura || m.saldoCierre || 0}`;
-                    monto = m.estado === 'cerrada' ? (m.saldoCierre || 0) : (m.saldoApertura || 0);
-                    colorFila = 'bg-blue-50';
-                  }
-
-                  const fecha = m.fecha?.toDate ? m.fecha.toDate() : new Date(m.fecha || m.hora);
-
-                  return (
-                    <React.Fragment key={m.id}>
-                    <tr 
-                      className={`border-t ${colorFila} cursor-pointer hover:opacity-90`}
-                      onClick={() => toggleFila(m.id)}
-                    >
-                      <td className="px-4 py-2">
-                        <button className="text-gray-500 hover:text-gray-700 mr-2">
-                          {filasExpandidas[m.id] ? '▼' : '▶'}
-                        </button>
-                        {fecha.toLocaleDateString('es-AR')}
-                      </td>
-                      <td className="px-4 py-2">{fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td className="px-4 py-2">{tipo}</td>
-                      <td className="px-4 py-2 capitalize">{m.negocio || m.sucursal || '-'}</td>
-                      <td className="px-4 py-2 max-w-xs truncate" title={detalle}>{detalle}</td>
-                      <td className={`px-4 py-2 text-right font-semibold ${monto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${Math.abs(monto).toLocaleString('es-AR')}
-                      </td>
-                      <td className="px-4 py-2">{m.tipoPago?.join(', ') || '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-500">{m.usuarioNombre || '-'}</td>
-                    </tr>
-                    {filasExpandidas[m.id] && (
-                      <tr key={`${m.id}-detalle`} className="border-t bg-gray-50">
-                        <td colSpan={8} className="px-4 py-3">
-                          <div className="text-sm">
-                            <p className="font-semibold mb-2">Detalle completo:</p>
-                            {m.origen === 'ventas' && m.productos && (
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="text-left">
-                                    <th className="py-1">Producto</th>
-                                    <th className="py-1">Cantidad</th>
-                                    <th className="py-1">Precio</th>
-                                    <th className="py-1">Subtotal</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {m.productos.map((p, idx) => (
-                                    <tr key={idx} className="border-b">
-                                      <td className="py-1">{p.nombre}</td>
-                                      <td className="py-1">{p.cantidad}</td>
-                                      <td className="py-1">${p.precio}</td>
-                                      <td className="py-1">${(p.precio * p.cantidad).toLocaleString('es-AR')}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
-                            {m.origen === 'retiros' && (
-                              <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${m.monto} | <strong>Obs:</strong> {m.observacion || '-'}</p>
-                            )}
-                            {m.origen === 'caja' && (
-                              <p>
-                                <strong>Saldo Apertura:</strong> ${m.saldoApertura || 0} | 
-                                <strong> Saldo Cierre:</strong> ${m.saldoCierre || 0} | 
-                                <strong> Estado:</strong> {m.estado}
-                              </p>
-                            )}
-                            {m.observacion && m.origen !== 'retiros' && (
-                              <p className="mt-2"><strong>Observación:</strong> {m.observacion}</p>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <TablaReportes movimientosFiltrados={movimientosFiltrados} filasExpandidas={filasExpandidas} toggleFila={toggleFila} tiposRetiroPersonalizados={tiposRetiroPersonalizados} onReimprimirTicket={imprimirTicketCajaCerrada} />
       )}
 
       {movimientosFiltrados.length === 0 && movimientos.length > 0 && (

@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
+import { Modal } from '../components/Modal';
 
 export const StockPage = () => {
   const { isGerente, user } = useAuth();
@@ -266,100 +267,95 @@ export const StockPage = () => {
         )}
       </div>
 
-      {showModal && puedeEditar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">{editando ? 'Editar' : 'Agregar'} Producto</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label className="block text-sm font-bold mb-1">Código de Barras</label>
-                <input
-                  type="text"
-                  value={formData.codigoBarras}
-                  onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
-                  className="w-full border p-2 rounded"
-                  placeholder="Escanear o ingresar"
-                />
-              </div>
-              <div className="mb-3">
-                <label className="block text-sm font-bold mb-1">Código Interno</label>
-                <input
-                  type="text"
-                  value={formData.codigoInterno}
-                  onChange={(e) => setFormData({ ...formData, codigoInterno: e.target.value })}
-                  className="w-full border p-2 rounded"
-                  required
-                />
-              </div>
-              <div className="mb-3">
-                <label className="block text-sm font-bold mb-1">Nombre</label>
-                <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                  className="w-full border p-2 rounded"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <label className="block text-sm font-bold mb-1">Precio Efectivo</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.precioEfectivo}
-                    onChange={(e) => setFormData({ ...formData, precioEfectivo: e.target.value })}
-                    className="w-full border p-2 rounded"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1">Precio Tarjeta</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.precioTarjeta}
-                    onChange={(e) => setFormData({ ...formData, precioTarjeta: e.target.value })}
-                    className="w-full border p-2 rounded"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <label className="block text-sm font-bold mb-1">Stock Chiclana</label>
-                  <input
-                    type="number"
-                    value={formData.stockChiclana}
-                    onChange={(e) => setFormData({ ...formData, stockChiclana: e.target.value })}
-                    className="w-full border p-2 rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1">Stock Belgrano</label>
-                  <input
-                    type="number"
-                    value={formData.stockBelgrano}
-                    onChange={(e) => setFormData({ ...formData, stockBelgrano: e.target.value })}
-                    className="w-full border p-2 rounded"
-                  />
-                </div>
-              </div>
-              <div className="bg-gray-100 p-2 rounded mb-3 text-sm text-center">
-                Stock Global: {calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano)}
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" disabled={procesando} className="bg-indigo-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
-                  {procesando ? 'Guardando...' : 'Guardar'}
-                </button>
-                <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded">
-                  Cancelar
-                </button>
-              </div>
-            </form>
+      <Modal open={showModal && puedeEditar} onClose={() => setShowModal(false)} title={editando ? 'Editar Producto' : 'Agregar Producto'}>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label className="block text-sm font-bold mb-1">Código de Barras</label>
+            <input
+              type="text"
+              value={formData.codigoBarras}
+              onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
+              className="w-full border p-2 rounded"
+              placeholder="Escanear o ingresar"
+            />
           </div>
-        </div>
-      )}
+          <div className="mb-3">
+            <label className="block text-sm font-bold mb-1">Código Interno</label>
+            <input
+              type="text"
+              value={formData.codigoInterno}
+              onChange={(e) => setFormData({ ...formData, codigoInterno: e.target.value })}
+              className="w-full border p-2 rounded"
+              required
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-sm font-bold mb-1">Nombre</label>
+            <input
+              type="text"
+              value={formData.nombre}
+              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              className="w-full border p-2 rounded"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label className="block text-sm font-bold mb-1">Precio Efectivo</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.precioEfectivo}
+                onChange={(e) => setFormData({ ...formData, precioEfectivo: e.target.value })}
+                className="w-full border p-2 rounded"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold mb-1">Precio Tarjeta</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.precioTarjeta}
+                onChange={(e) => setFormData({ ...formData, precioTarjeta: e.target.value })}
+                className="w-full border p-2 rounded"
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label className="block text-sm font-bold mb-1">Stock Chiclana</label>
+              <input
+                type="number"
+                value={formData.stockChiclana}
+                onChange={(e) => setFormData({ ...formData, stockChiclana: e.target.value })}
+                className="w-full border p-2 rounded"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold mb-1">Stock Belgrano</label>
+              <input
+                type="number"
+                value={formData.stockBelgrano}
+                onChange={(e) => setFormData({ ...formData, stockBelgrano: e.target.value })}
+                className="w-full border p-2 rounded"
+              />
+            </div>
+          </div>
+          <div className="bg-gray-100 p-2 rounded mb-3 text-sm text-center">
+            Stock Global: {calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano)}
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={procesando} className="bg-indigo-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
+              {procesando ? 'Guardando...' : 'Guardar'}
+            </button>
+            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Modal>
     </Layout>
   );
 };

@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Layout } from '../components/Layout';
+import { Modal } from '../components/Modal';
 
 export const MovimientosPage = () => {
   const { user } = useAuth();
@@ -263,99 +264,88 @@ export const MovimientosPage = () => {
         )}
       </div>
 
-      {/* Modal Mover Stock */}
-      {showMovimiento && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">Mover Stock entre Negocios</h3>
-            
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div>
-                <label className="block text-sm font-bold mb-1">Origen</label>
-                <select
-                  value={movimientoOrigen}
-                  onChange={(e) => setMovimientoOrigen(e.target.value)}
-                  className="w-full border p-2 rounded"
-                >
-                  <option value="chiclana">Chiclana</option>
-                  <option value="belgrano">Belgrano</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold mb-1">Destino</label>
-                <select
-                  value={movimientoDestino}
-                  onChange={(e) => setMovimientoDestino(e.target.value)}
-                  className="w-full border p-2 rounded"
-                >
-                  <option value="belgrano">Belgrano</option>
-                  <option value="chiclana">Chiclana</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-sm font-bold mb-1">Buscar Producto</label>
-              <input
-                type="text"
-                value={busquedaMovimiento}
-                onChange={(e) => setBusquedaMovimiento(e.target.value)}
-                placeholder="Código, código interno o nombre..."
-                className="w-full border p-2 rounded"
-              />
-              {busquedaMovimiento && (
-                <div className="max-h-32 overflow-y-auto border mt-1 rounded">
-                  {buscarProducto(busquedaMovimiento).map(p => (
-                    <div
-                      key={p.id}
-                      onClick={() => agregarAMovimiento(p)}
-                      className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
-                    >
-                      {p.nombre} ({p.codigoInterno})
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {listaMovimiento.length > 0 && (
-              <div className="mb-3 border rounded p-2">
-                <p className="text-sm font-bold mb-2">Productos a mover:</p>
-                {listaMovimiento.map(item => (
-                  <div key={item.id} className="flex items-center justify-between py-1 border-b text-sm">
-                    <span className="truncate w-24">{item.nombre}</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.cantidad}
-                        onChange={(e) => setListaMovimiento(listaMovimiento.map(p => p.id === item.id ? { ...p, cantidad: parseInt(e.target.value) || 1 } : p))}
-                        className="w-16 border p-1 rounded text-center"
-                      />
-                      <button onClick={() => quitarDeMovimiento(item.id)} className="text-red-500 ml-2">✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <button onClick={moverStock} disabled={procesando} className="bg-blue-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
-                {procesando ? 'Moviendo...' : 'Confirmar Movimiento'}
-              </button>
-              <button onClick={() => { setShowMovimiento(false); setListaMovimiento([]); }} className="bg-gray-300 px-4 py-2 rounded">
-                Cancelar
-              </button>
-            </div>
+      <Modal open={showMovimiento} onClose={() => { setShowMovimiento(false); setListaMovimiento([]); }} title="Mover Stock entre Negocios">
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <label className="block text-sm font-bold mb-1">Origen</label>
+            <select
+              value={movimientoOrigen}
+              onChange={(e) => setMovimientoOrigen(e.target.value)}
+              className="w-full border p-2 rounded"
+            >
+              <option value="chiclana">Chiclana</option>
+              <option value="belgrano">Belgrano</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-bold mb-1">Destino</label>
+            <select
+              value={movimientoDestino}
+              onChange={(e) => setMovimientoDestino(e.target.value)}
+              className="w-full border p-2 rounded"
+            >
+              <option value="belgrano">Belgrano</option>
+              <option value="chiclana">Chiclana</option>
+            </select>
           </div>
         </div>
-      )}
 
-      {/* Modal Ingreso Mercadería */}
-      {showIngreso && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">Ingreso de Mercadería</h3>
+        <div className="mb-3">
+          <label className="block text-sm font-bold mb-1">Buscar Producto</label>
+          <input
+            type="text"
+            value={busquedaMovimiento}
+            onChange={(e) => setBusquedaMovimiento(e.target.value)}
+            placeholder="Código, código interno o nombre..."
+            className="w-full border p-2 rounded"
+          />
+          {busquedaMovimiento && (
+            <div className="max-h-32 overflow-y-auto border mt-1 rounded">
+              {buscarProducto(busquedaMovimiento).map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => agregarAMovimiento(p)}
+                  className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+                >
+                  {p.nombre} ({p.codigoInterno})
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {listaMovimiento.length > 0 && (
+          <div className="mb-3 border rounded p-2">
+            <p className="text-sm font-bold mb-2">Productos a mover:</p>
+            {listaMovimiento.map(item => (
+              <div key={item.id} className="flex items-center justify-between py-1 border-b text-sm">
+                <span className="truncate w-24">{item.nombre}</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.cantidad}
+                    onChange={(e) => setListaMovimiento(listaMovimiento.map(p => p.id === item.id ? { ...p, cantidad: parseInt(e.target.value) || 1 } : p))}
+                    className="w-16 border p-1 rounded text-center"
+                  />
+                  <button onClick={() => quitarDeMovimiento(item.id)} className="text-red-500 ml-2">✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={moverStock} disabled={procesando} className="bg-blue-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
+            {procesando ? 'Moviendo...' : 'Confirmar Movimiento'}
+          </button>
+          <button onClick={() => { setShowMovimiento(false); setListaMovimiento([]); }} className="bg-gray-300 px-4 py-2 rounded">
+            Cancelar
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={showIngreso} onClose={() => { setShowIngreso(false); setListaIngreso([]); }} title="Ingreso de Mercadería">
             
             <div className="mb-3">
               <label className="block text-sm font-bold mb-1">Negocio destino</label>
@@ -421,9 +411,7 @@ export const MovimientosPage = () => {
                 Cancelar
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </Layout>
   );
 };

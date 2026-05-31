@@ -6,6 +6,10 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
+import { Modal } from '../components/Modal';
+import { ResumenCaja } from '../components/ResumenCaja';
+import { HistorialMovimientos } from '../components/HistorialMovimientos';
+import { getDireccion, getSucursalNombre, TELEFONO } from '../utils/ticketPrinter';
 
 const NEGOCIOS = [
   { id: 'chiclana', nombre: 'Chiclana' },
@@ -390,8 +394,8 @@ const imprimirTicketCierre = () => {
     const ahora = new Date();
     const fechaCierre = ahora.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
     const fechaApertura = caja.fecha ? new Date(caja.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
-    const direccion = caja.sucursal === 'chiclana' ? 'Chiclana 115' : caja.sucursal === 'belgrano' ? 'Belgrano 84' : caja.sucursal;
-    const sucursalNombre = caja.sucursal === 'chiclana' ? 'CHICLANA' : caja.sucursal === 'belgrano' ? 'BELGRANO' : caja.sucursal.toUpperCase();
+    const direccion = getDireccion(caja.sucursal);
+    const sucursalNombre = getSucursalNombre(caja.sucursal);
 
     const formatMonto = (monto) => monto.toLocaleString('es-AR').padStart(8);
 
@@ -402,7 +406,7 @@ const imprimirTicketCierre = () => {
     let ticket = `====================================
       SANTOS Y SANTAS
     ${direccion}
-    Tel: 2915245537
+    Tel: ${TELEFONO}
 ===================================
      CIERRE DE CAJA
 ${fechaCierre}    ${sucursalNombre}
@@ -614,7 +618,7 @@ ${fechaCierre}    ${sucursalNombre}
             >
               <span className="text-4xl block mb-3">🏪</span>
               <span className="text-lg font-bold">Chiclana</span>
-              <span className="text-sm text-gray-500 block mt-1">Chiclana 115</span>
+              <span className="text-sm text-gray-500 block mt-1">{getDireccion('chiclana')}</span>
             </button>
             <button
               onClick={() => setSelectedNegocio('belgrano')}
@@ -622,7 +626,7 @@ ${fechaCierre}    ${sucursalNombre}
             >
               <span className="text-4xl block mb-3">🏪</span>
               <span className="text-lg font-bold">Belgrano</span>
-              <span className="text-sm text-gray-500 block mt-1">Belgrano 84</span>
+              <span className="text-sm text-gray-500 block mt-1">{getDireccion('belgrano')}</span>
             </button>
           </div>
         </div>
@@ -682,39 +686,7 @@ ${fechaCierre}    ${sucursalNombre}
                 <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Abierta</span>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
-                <div className="bg-gray-50 p-3 rounded">
-                  <p className="text-sm text-gray-500">Saldo Apertura</p>
-                  <p className="font-semibold">${caja.saldoApertura}</p>
-                </div>
-                <div className="bg-green-50 p-3 rounded">
-                  <p className="text-sm text-gray-500">Ventas Brutas</p>
-                  <p className="font-semibold text-green-600">${ventasBrutas}</p>
-                </div>
-                <div className="bg-red-50 p-3 rounded">
-                  <p className="text-sm text-gray-500">Notas Crédito</p>
-                  <p className="font-semibold text-red-600">-${notaCreditoTotal}</p>
-                </div>
-                <div className="bg-purple-50 p-3 rounded">
-                  <p className="text-sm text-gray-500">Venta Neta</p>
-                  <p className="font-semibold text-purple-600">${ventaNeta}</p>
-                </div>
-                <div className="bg-blue-50 p-3 rounded">
-                  <p className="text-sm text-gray-500">Efectivo en Caja</p>
-                  <p className="font-semibold text-blue-600">${efectivoCaja}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-50 rounded">
-                <p className="text-sm font-semibold mb-2">Ventas por Método:</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <p>Efectivo: <span className="font-semibold">${ventasEfectivo}</span></p>
-                  <p>Tarjeta: <span className="font-semibold">${ventasTarjeta}</span></p>
-                  <p>Débito: <span className="font-semibold">${ventasDebito}</span></p>
-                  <p>MercadoPago: <span className="font-semibold">${ventasMercadoPago}</span></p>
-                  <p>Cuenta DNI: <span className="font-semibold">${ventasCuentaDNI}</span></p>
-                </div>
-              </div>
+              <ResumenCaja caja={caja} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} ventaNeta={ventaNeta} efectivoCaja={efectivoCaja} ventasEfectivo={ventasEfectivo} ventasTarjeta={ventasTarjeta} ventasDebito={ventasDebito} ventasMercadoPago={ventasMercadoPago} ventasCuentaDNI={ventasCuentaDNI} />
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow">
@@ -762,418 +734,280 @@ ${fechaCierre}    ${sucursalNombre}
 
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-xl font-semibold mb-4">Historial de Movimientos</h3>
+            <HistorialMovimientos ventasHoy={ventasHoy} retiros={retiros} isGerente={isGerente} TIPOS_RETIRO_FIJOS={TIPOS_RETIRO_FIJOS} tiposRetiroPersonalizados={tiposRetiroPersonalizados} handleOpenEdit={handleOpenEdit} handleEliminarVenta={handleEliminarVenta} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} efectivoCaja={efectivoCaja} />
+          </div>
+        </div>
+      )}
+
+      <Modal open={mostrarModalRetiro} onClose={() => { setMostrarModalRetiro(false); setTipoRetiro(''); setMontoRetiro(''); setObservacionRetiro(''); }} title="Nuevo Retiro">
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Tipo de Retiro</label>
+          <div className="flex gap-2">
+            <select
+              value={tipoRetiro}
+              onChange={(e) => {
+                if (e.target.value === '__nuevo__') {
+                  setMostrarModalNuevoTipo(true);
+                } else {
+                  setTipoRetiro(e.target.value);
+                }
+              }}
+              className="flex-1 border p-2 rounded"
+            >
+              <option value="">-- Seleccionar --</option>
+              {TIPOS_RETIRO_FIJOS.map(t => (
+                <option key={t.id} value={t.id}>{t.icono} {t.nombre}</option>
+              ))}
+              {tiposRetiroPersonalizados.map(t => (
+                <option key={t.id} value={t.id}>{t.icono} {t.nombre}</option>
+              ))}
+              <option value="__nuevo__">+ Crear nuevo tipo</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">
+            Monto (disponible: ${efectivoCaja || 0})
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={montoRetiro}
+            onChange={(e) => setMontoRetiro(e.target.value)}
+            className="w-full border p-2 rounded"
+            placeholder="0.00"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Observación (opcional)</label>
+          <textarea
+            value={observacionRetiro}
+            onChange={(e) => setObservacionRetiro(e.target.value)}
+            className="w-full border p-2 rounded"
+            placeholder="Ej: Limpieza, retiro para caja fuerte..."
+            rows={2}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={crearRetiro}
+            disabled={procesando || !tipoRetiro || !montoRetiro}
+            className="flex-1 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 disabled:opacity-50"
+          >
+            {procesando ? 'Registrando...' : 'Confirmar Retiro'}
+          </button>
+          <button
+            onClick={() => {
+              setMostrarModalRetiro(false);
+              setTipoRetiro('');
+              setMontoRetiro('');
+              setObservacionRetiro('');
+            }}
+            className="px-4 py-2 border rounded hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={mostrarModalNuevoTipo} onClose={() => { setMostrarModalNuevoTipo(false); setNombreNuevoTipo(''); setIconoNuevoTipo('💰'); }} title="Nuevo Tipo de Retiro">
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Nombre</label>
+          <input
+            type="text"
+            value={nombreNuevoTipo}
+            onChange={(e) => setNombreNuevoTipo(e.target.value)}
+            className="w-full border p-2 rounded"
+            placeholder="Ej: Gasto Diario"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Icono</label>
+          <select
+            value={iconoNuevoTipo}
+            onChange={(e) => setIconoNuevoTipo(e.target.value)}
+            className="w-full border p-2 rounded"
+          >
+            <option value="💰">💰 Dinero</option>
+            <option value="🧹">🧹 Limpieza</option>
+            <option value="👔">👔 Gerente</option>
+            <option value="⚠️">⚠️ Error</option>
+            <option value="📦">📦 Insumo</option>
+            <option value="🚚">🚚 Envío</option>
+            <option value="🍕">🍕 Comida</option>
+            <option value="💡">💡 Servicio</option>
+          </select>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={crearTipoRetiro}
+            disabled={procesando || !nombreNuevoTipo.trim()}
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {procesando ? 'Creando...' : 'Crear Tipo'}
+          </button>
+          <button
+            onClick={() => {
+              setMostrarModalNuevoTipo(false);
+              setNombreNuevoTipo('');
+              setIconoNuevoTipo('💰');
+            }}
+            className="px-4 py-2 border rounded hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={mostrarModalCierre} onClose={() => setMostrarModalCierre(false)} noClose className="max-w-md overflow-hidden p-0">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-center">
+          <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
+            🖨️ Cerrar Caja
+          </h2>
+        </div>
+        
+        <div className="p-5">
+          <div className="bg-gray-50 rounded-lg p-4 mb-5">
+            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              📊 Resumen del Día
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Ventas Brutas:</span>
+                <span className="font-medium">${ventasBrutas.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Notas Crédito:</span>
+                <span className="font-medium text-red-600">-${notaCreditoTotal.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                <span>💰 VENTA NETA:</span>
+                <span className="text-green-600">${ventaNeta.toLocaleString('es-AR')}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 mb-5">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Efectivo en Caja:</span>
+                <span className="font-medium">${efectivoCaja.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Saldo Sistema:</span>
+                <span className="font-medium">${saldoSistema.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                <span>Diferencia:</span>
+                <span className={diferencia === 0 ? 'text-green-600' : 'text-red-600'}>
+                  ${diferencia.toLocaleString('es-AR')}
+                </span>
+              </div>
+            </div>
             
-            {ventasHoy.length === 0 ? (
-              <p className="text-gray-500">No hay movimientos aún</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Hora</th>
-                      <th className="text-left py-2">Tipo</th>
-                      <th className="text-left py-2">Monto</th>
-                      <th className="text-left py-2">Método</th>
-                      <th className="text-left py-2">Observación</th>
-                      {isGerente && <th className="text-right py-2 w-20">Acciones</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ventasHoy.length === 0 && retiros.length === 0 ? (
-                      <tr>
-                        <td colSpan={isGerente ? 6 : 5} className="text-center py-4 text-gray-500">No hay movimientos aún</td>
-                      </tr>
-                    ) : (
-                      [...ventasHoy, ...retiros]
-                        .sort((a, b) => new Date(b.hora || b.fecha) - new Date(a.hora || a.fecha))
-                        .map((item) => {
-                          if (item.monto !== undefined && item.tipo) {
-                            const tipoRetiro = TIPOS_RETIRO_FIJOS.find(t => t.id === item.tipo) || tiposRetiroPersonalizados.find(t => t.id === item.tipo);
-                            return (
-                              <tr key={item.id} className="border-b bg-orange-50">
-                                <td className="py-2 whitespace-nowrap">
-                                  {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                                </td>
-                                <td className="py-2">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
-                                    💸 {tipoRetiro?.nombre || item.tipo}
-                                  </span>
-                                </td>
-                                <td className="py-2 font-bold text-red-700">
-                                  -${item.monto.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                                </td>
-                                <td className="py-2 capitalize text-gray-600">-</td>
-                                <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
-                                {isGerente && <td className="py-2"></td>}
-                              </tr>
-                            );
-                          }
-                          
-                          const esNotaCredito = item.tipoVenta === 'notaCredito' || (item.tipoVenta === 'mixta' && item.diferencia < 0);
-                          const esMixta = item.tipoVenta === 'mixta';
-                          const montoMostrar = item.diferencia !== undefined 
-                            ? (item.diferencia < 0 ? Math.abs(item.diferencia) : item.diferencia)
-                            : item.total;
-                          const tipoLabel = esNotaCredito 
-                            ? (esMixta ? 'Mixta (NC)' : 'Nota Crédito') 
-                            : (esMixta ? 'Mixta' : 'Venta');
-                          
-                          return (
-                            <tr key={item.id} className={`border-b ${esNotaCredito ? 'bg-red-50' : 'bg-green-50'}`}>
-                              <td className="py-2 whitespace-nowrap">
-                                {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                              </td>
-                              <td className="py-2">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                  esNotaCredito ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                }`}>
-                                  {esNotaCredito ? '⬇️' : '⬆️'} {tipoLabel}
-                                </span>
-                              </td>
-                              <td className={`py-2 font-bold ${esNotaCredito ? 'text-red-700' : 'text-green-700'}`}>
-                                {esNotaCredito && <span className="text-red-500 mr-1">-</span>}
-                                ${montoMostrar.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                              </td>
-                              <td className="py-2 capitalize text-gray-600">
-                                {item.tipoPago?.map(p => {
-                                  const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP',cuentadni: 'DNI' };
-                                  return nombres[p] || p;
-                                }).join(', ') || '-'}
-                              </td>
-                              <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
-                              {isGerente && (
-                                <td className="py-2 text-right whitespace-nowrap">
-                                  <button
-                                    onClick={() => handleOpenEdit(item)}
-                                    className="text-blue-600 hover:text-blue-800 mr-1 text-xs"
-                                    title="Editar"
-                                  >✏️</button>
-                                  <button
-                                    onClick={() => handleEliminarVenta(item)}
-                                    className="text-red-600 hover:text-red-800 text-xs"
-                                    title="Eliminar"
-                                  >🗑️</button>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })
-                    )}
-                  </tbody>
-                  <tfoot className="bg-gray-100 font-semibold">
-                    <tr>
-                      <td className="py-2 pl-2">TOTALES</td>
-                      <td className="py-2"></td>
-                      <td className="py-2">
-                        <span className="text-green-700">${ventasBrutas.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
-                        <span className="text-red-600 ml-2">NC: -${notaCreditoTotal.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
-                        {retiros.length > 0 && (
-                          <span className="text-orange-600 ml-2">R: -${retiros.reduce((sum, r) => sum + r.monto, 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
-                        )}
-                      </td>
-                      <td className="py-2 text-blue-700" colSpan={isGerente ? 3 : 2}>
-                        Efectivo: ${efectivoCaja.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+            {diferencia !== 0 && (
+              <div className="mt-3 p-2 bg-red-100 text-red-700 text-xs rounded flex items-center gap-1">
+                ⚠️ La diferencia no coincide con el saldo del sistema
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {mostrarModalRetiro && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4">Nuevo Retiro</h3>
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => cerrarCaja(true)}
+              disabled={procesando}
+              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              🖨️ Cerrar Caja e Imprimir
+            </button>
             
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">Tipo de Retiro</label>
-              <div className="flex gap-2">
-                <select
-                  value={tipoRetiro}
-                  onChange={(e) => {
-                    if (e.target.value === '__nuevo__') {
-                      setMostrarModalNuevoTipo(true);
-                    } else {
-                      setTipoRetiro(e.target.value);
-                    }
+            <button
+              onClick={() => cerrarCaja(false)}
+              disabled={procesando}
+              className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              ❌ Cerrar sin Imprimir
+            </button>
+            
+            <button
+              onClick={() => setMostrarModalCierre(false)}
+              className="w-full border border-gray-300 text-gray-600 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={editandoVenta && isGerente} onClose={() => setEditandoVenta(null)} title="Modificar Venta">
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Total</label>
+          <input
+            type="number"
+            step="0.01"
+            value={nuevoTotal}
+            onChange={(e) => setNuevoTotal(e.target.value)}
+            className="w-full border p-2 rounded"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Métodos de pago</label>
+          <div className="space-y-1">
+            {METODOS_PAGO.map(m => (
+              <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={nuevosPagos.includes(m.id)}
+                  onChange={() => {
+                    setNuevosPagos(prev =>
+                      prev.includes(m.id)
+                        ? prev.filter(p => p !== m.id)
+                        : [...prev, m.id]
+                    );
                   }}
-                  className="flex-1 border p-2 rounded"
-                >
-                  <option value="">-- Seleccionar --</option>
-                  {TIPOS_RETIRO_FIJOS.map(t => (
-                    <option key={t.id} value={t.id}>{t.icono} {t.nombre}</option>
-                  ))}
-                  {tiposRetiroPersonalizados.map(t => (
-                    <option key={t.id} value={t.id}>{t.icono} {t.nombre}</option>
-                  ))}
-                  <option value="__nuevo__">+ Crear nuevo tipo</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">
-                Monto (disponible: ${efectivoCaja || 0})
+                  className="rounded"
+                />
+                {m.nombre}
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={montoRetiro}
-                onChange={(e) => setMontoRetiro(e.target.value)}
-                className="w-full border p-2 rounded"
-                placeholder="0.00"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">Observación (opcional)</label>
-              <textarea
-                value={observacionRetiro}
-                onChange={(e) => setObservacionRetiro(e.target.value)}
-                className="w-full border p-2 rounded"
-                placeholder="Ej: Limpieza, retiro para caja fuerte..."
-                rows={2}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={crearRetiro}
-                disabled={procesando || !tipoRetiro || !montoRetiro}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 disabled:opacity-50"
-              >
-                {procesando ? 'Registrando...' : 'Confirmar Retiro'}
-              </button>
-              <button
-                onClick={() => {
-                  setMostrarModalRetiro(false);
-                  setTipoRetiro('');
-                  setMontoRetiro('');
-                  setObservacionRetiro('');
-                }}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
+            ))}
           </div>
         </div>
-      )}
 
-      {mostrarModalNuevoTipo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4">Nuevo Tipo de Retiro</h3>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">Nombre</label>
-              <input
-                type="text"
-                value={nombreNuevoTipo}
-                onChange={(e) => setNombreNuevoTipo(e.target.value)}
-                className="w-full border p-2 rounded"
-                placeholder="Ej: Gasto Diario"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">Icono</label>
-              <select
-                value={iconoNuevoTipo}
-                onChange={(e) => setIconoNuevoTipo(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
-                <option value="💰">💰 Dinero</option>
-                <option value="🧹">🧹 Limpieza</option>
-                <option value="👔">👔 Gerente</option>
-                <option value="⚠️">⚠️ Error</option>
-                <option value="📦">📦 Insumo</option>
-                <option value="🚚">🚚 Envío</option>
-                <option value="🍕">🍕 Comida</option>
-                <option value="💡">💡 Servicio</option>
-              </select>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={crearTipoRetiro}
-                disabled={procesando || !nombreNuevoTipo.trim()}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {procesando ? 'Creando...' : 'Crear Tipo'}
-              </button>
-              <button
-                onClick={() => {
-                  setMostrarModalNuevoTipo(false);
-                  setNombreNuevoTipo('');
-                  setIconoNuevoTipo('💰');
-                }}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">
+            Motivo de modificación <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={motivoEdicion}
+            onChange={(e) => setMotivoEdicion(e.target.value)}
+            placeholder="Ej: Cliente pagó con tarjeta, no efectivo"
+            className="w-full border p-2 rounded text-sm"
+            rows={2}
+          />
         </div>
-      )}
 
-      {mostrarModalCierre && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-center">
-              <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
-                🖨️ Cerrar Caja
-              </h2>
-            </div>
-            
-            <div className="p-5">
-              <div className="bg-gray-50 rounded-lg p-4 mb-5">
-                <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  📊 Resumen del Día
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Ventas Brutas:</span>
-                    <span className="font-medium">${ventasBrutas.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Notas Crédito:</span>
-                    <span className="font-medium text-red-600">-${notaCreditoTotal.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2 flex justify-between font-bold">
-                    <span>💰 VENTA NETA:</span>
-                    <span className="text-green-600">${ventaNeta.toLocaleString('es-AR')}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4 mb-5">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Efectivo en Caja:</span>
-                    <span className="font-medium">${efectivoCaja.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Saldo Sistema:</span>
-                    <span className="font-medium">${saldoSistema.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2 flex justify-between font-bold">
-                    <span>Diferencia:</span>
-                    <span className={diferencia === 0 ? 'text-green-600' : 'text-red-600'}>
-                      ${diferencia.toLocaleString('es-AR')}
-                    </span>
-                  </div>
-                </div>
-                
-                {diferencia !== 0 && (
-                  <div className="mt-3 p-2 bg-red-100 text-red-700 text-xs rounded flex items-center gap-1">
-                    ⚠️ La diferencia no coincide con el saldo del sistema
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-3">
-                <button
-                  onClick={() => cerrarCaja(true)}
-                  disabled={procesando}
-                  className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  🖨️ Cerrar Caja e Imprimir
-                </button>
-                
-                <button
-                  onClick={() => cerrarCaja(false)}
-                  disabled={procesando}
-                  className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  ❌ Cerrar sin Imprimir
-                </button>
-                
-                <button
-                  onClick={() => setMostrarModalCierre(false)}
-                  className="w-full border border-gray-300 text-gray-600 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGuardarEdicion}
+            disabled={procesando || !motivoEdicion.trim()}
+            className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 font-medium"
+          >
+            {procesando ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+          <button
+            onClick={() => setEditandoVenta(null)}
+            className="px-4 py-2 border rounded hover:bg-gray-50 font-medium"
+          >
+            Cancelar
+          </button>
         </div>
-      )}
-
-      {editandoVenta && isGerente && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">Modificar Venta</h3>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">Total</label>
-              <input
-                type="number"
-                step="0.01"
-                value={nuevoTotal}
-                onChange={(e) => setNuevoTotal(e.target.value)}
-                className="w-full border p-2 rounded"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">Métodos de pago</label>
-              <div className="space-y-1">
-                {METODOS_PAGO.map(m => (
-                  <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={nuevosPagos.includes(m.id)}
-                      onChange={() => {
-                        setNuevosPagos(prev =>
-                          prev.includes(m.id)
-                            ? prev.filter(p => p !== m.id)
-                            : [...prev, m.id]
-                        );
-                      }}
-                      className="rounded"
-                    />
-                    {m.nombre}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1">
-                Motivo de modificación <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={motivoEdicion}
-                onChange={(e) => setMotivoEdicion(e.target.value)}
-                placeholder="Ej: Cliente pagó con tarjeta, no efectivo"
-                className="w-full border p-2 rounded text-sm"
-                rows={2}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleGuardarEdicion}
-                disabled={procesando || !motivoEdicion.trim()}
-                className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 font-medium"
-              >
-                {procesando ? 'Guardando...' : 'Guardar cambios'}
-              </button>
-              <button
-                onClick={() => setEditandoVenta(null)}
-                className="px-4 py-2 border rounded hover:bg-gray-50 font-medium"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </Layout>
   );
 };

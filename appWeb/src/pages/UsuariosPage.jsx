@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
+import { Modal } from '../components/Modal';
 
 export const UsuariosPage = () => {
   const { isGerente, user } = useAuth();
@@ -148,68 +149,63 @@ export const UsuariosPage = () => {
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">{editando ? 'Editar' : 'Agregar'} Usuario</h3>
-            <form onSubmit={handleSubmit}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editando ? 'Editar Usuario' : 'Agregar Usuario'}>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-bold mb-1">Nombre</label>
+            <input
+              type="text"
+              value={formData.nombre}
+              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              className="w-full border p-2 rounded"
+              required
+            />
+          </div>
+          {!editando && (
+            <>
               <div className="mb-4">
-                <label className="block text-sm font-bold mb-1">Nombre</label>
+                <label className="block text-sm font-bold mb-1">Email</label>
                 <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full border p-2 rounded"
                   required
                 />
               </div>
-              {!editando && (
-                <>
-                  <div className="mb-4">
-                    <label className="block text-sm font-bold mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full border p-2 rounded"
-                      required
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label className="block text-sm font-bold mb-1">Contraseña</label>
-                    <input
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full border p-2 rounded"
-                      required
-                    />
-                  </div>
-                </>
-              )}
               <div className="mb-4">
-                <label className="block text-sm font-bold mb-1">Rol</label>
-                <select
-                  value={formData.rol}
-                  onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
+                <label className="block text-sm font-bold mb-1">Contraseña</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full border p-2 rounded"
-                >
-                  <option value="empleado">Empleado</option>
-                  <option value="gerente">Gerente</option>
-                </select>
+                  required
+                />
               </div>
-              <div className="flex gap-2">
-                <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded flex-1">
-                  Guardar
-                </button>
-                <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded">
-                  Cancelar
-                </button>
-              </div>
-            </form>
+            </>
+          )}
+          <div className="mb-4">
+            <label className="block text-sm font-bold mb-1">Rol</label>
+            <select
+              value={formData.rol}
+              onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
+              className="w-full border p-2 rounded"
+            >
+              <option value="empleado">Empleado</option>
+              <option value="gerente">Gerente</option>
+            </select>
           </div>
-        </div>
-      )}
+          <div className="flex gap-2">
+            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded flex-1">
+              Guardar
+            </button>
+            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Modal>
     </Layout>
   );
 };

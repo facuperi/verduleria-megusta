@@ -9,9 +9,10 @@ import { Layout } from '../components/Layout';
 import { BuscadorProductos } from '../components/BuscadorProductos';
 import { CarritoVentas } from '../components/CarritoVentas';
 import { imprimirTicketAFavor, imprimirTicketVenta } from '../utils/ticketPrinter';
+import { Modal } from '../components/Modal';
 
-const FIREBASE_FUNCTIONS_URL = 'https://facturarventa-v7nkl2aufq-uc.a.run.app';
-const AFIP_PTO_VTA = 9;
+const FIREBASE_FUNCTIONS_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL;
+const AFIP_PTO_VTA = parseInt(import.meta.env.VITE_AFIP_PTO_VTA) || 9;
 
 const calcularIva = (total) => {
   const neto = Math.round(total / 1.21 * 100) / 100;
@@ -568,50 +569,42 @@ export const VentasPage = () => {
         </div>
       </div>
 
-      {mostrarModalFactura && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4">
-              {tipoFacturaSeleccionado === 'A' ? '📄 Factura A' : '📄 Factura Consumidor Final'}
-            </h3>
-            
-            {tipoFacturaSeleccionado === 'A' && (
-              <div className="mb-4">
-                <label className="block text-sm font-semibold mb-1">CUIT del comprador (sin guiones)</label>
-                <input
-                  type="text"
-                  value={cuitCliente}
-                  onChange={(e) => setCuitCliente(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Ej: 20123456789"
-                  maxLength={11}
-                  className="w-full border p-2 rounded"
-                />
-                <p className="text-xs text-gray-500 mt-1">Ingresá los 11 dígitos del CUIT</p>
-              </div>
-            )}
-            
-            {tipoFacturaSeleccionado === 'B' && (
-              <p className="mb-4 text-gray-600">Se generará una Factura B para consumidor final.</p>
-            )}
-            
-            <div className="flex gap-2">
-              <button
-                onClick={handleConfirmarFactura}
-                disabled={tipoFacturaSeleccionado === 'A' && (!cuitCliente || cuitCliente.length !== 11)}
-                className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                Confirmar
-              </button>
-              <button
-                onClick={() => setMostrarModalFactura(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
+      <Modal open={mostrarModalFactura} onClose={() => setMostrarModalFactura(false)} title={tipoFacturaSeleccionado === 'A' ? '📄 Factura A' : '📄 Factura Consumidor Final'}>
+        {tipoFacturaSeleccionado === 'A' && (
+          <div className="mb-4">
+            <label className="block text-sm font-semibold mb-1">CUIT del comprador (sin guiones)</label>
+            <input
+              type="text"
+              value={cuitCliente}
+              onChange={(e) => setCuitCliente(e.target.value.replace(/\D/g, ''))}
+              placeholder="Ej: 20123456789"
+              maxLength={11}
+              className="w-full border p-2 rounded"
+            />
+            <p className="text-xs text-gray-500 mt-1">Ingresá los 11 dígitos del CUIT</p>
           </div>
+        )}
+        
+        {tipoFacturaSeleccionado === 'B' && (
+          <p className="mb-4 text-gray-600">Se generará una Factura B para consumidor final.</p>
+        )}
+        
+        <div className="flex gap-2">
+          <button
+            onClick={handleConfirmarFactura}
+            disabled={tipoFacturaSeleccionado === 'A' && (!cuitCliente || cuitCliente.length !== 11)}
+            className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            Confirmar
+          </button>
+          <button
+            onClick={() => setMostrarModalFactura(false)}
+            className="px-4 py-2 border rounded hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
         </div>
-      )}
+      </Modal>
     </Layout>
   );
 };
