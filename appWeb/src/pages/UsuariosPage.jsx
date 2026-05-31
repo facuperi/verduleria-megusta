@@ -7,6 +7,8 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
+import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
 
 export const UsuariosPage = () => {
@@ -87,7 +89,7 @@ export const UsuariosPage = () => {
   };
 
   if (loading) {
-    return <Layout><div className="text-center py-8">Cargando...</div></Layout>;
+    return <Layout><LoadingSkeleton type="page" /></Layout>;
   }
 
   if (!canAccess) {
@@ -145,7 +147,7 @@ export const UsuariosPage = () => {
           </tbody>
         </table>
         {usuarios.length === 0 && (
-          <p className="text-center py-4 text-gray-500">No hay usuarios registrados</p>
+            <EmptyState title="No hay usuarios registrados" icon="👤" />
         )}
       </div>
 

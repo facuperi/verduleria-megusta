@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 import { FiltrosReportes } from '../components/FiltrosReportes';
+import { EmptyState } from '../components/EmptyState';
 import { ResumenReportes } from '../components/ResumenReportes';
 import { TablaReportes } from '../components/TablaReportes';
 import { imprimirTicketCajaCerrada } from '../utils/ticketPrinter';
@@ -502,11 +503,11 @@ export const ReportesPage = () => {
       )}
 
       {movimientosFiltrados.length === 0 && movimientos.length > 0 && (
-        <p className="text-center py-8 text-gray-500">No hay movimientos con los filtros seleccionados</p>
+        <EmptyState title="No hay movimientos con los filtros seleccionados" icon="🔍" />
       )}
 
       {movimientos.length === 0 && !loading && fechaDesde && fechaHasta && (
-        <p className="text-center py-8 text-gray-500">No hay movimientos en el período seleccionado</p>
+        <EmptyState title="No hay movimientos en el período seleccionado" icon="📅" />
       )}
 
       {!fechaDesde && !fechaHasta && (

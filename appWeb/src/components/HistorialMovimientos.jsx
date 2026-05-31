@@ -1,6 +1,6 @@
 export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETIRO_FIJOS, tiposRetiroPersonalizados, handleOpenEdit, handleEliminarVenta, ventasBrutas, notaCreditoTotal, efectivoCaja }) => {
   if (ventasHoy.length === 0) {
-    return <p className="text-gray-500">No hay movimientos aún</p>;
+    return <EmptyState title="No hay movimientos aún" />;
   }
 
   return (

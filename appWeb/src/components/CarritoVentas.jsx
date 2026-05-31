@@ -6,6 +6,8 @@ const METODOS_PAGO = [
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
+import { EmptyState } from './EmptyState';
+
 export const CarritoVentas = ({
   carrito,
   totalVenta,
@@ -38,7 +40,7 @@ export const CarritoVentas = ({
       )}
 
       {carrito.length === 0 ? (
-        <p className="text-gray-500">El carrito está vacío</p>
+        <EmptyState title="El carrito está vacío" icon="🛒" />
       ) : (
         <div className="bg-white p-4 rounded-lg shadow mb-4">
           {carrito.map((item, index) => {

@@ -9,6 +9,7 @@ import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
 import { ResumenCaja } from '../components/ResumenCaja';
 import { HistorialMovimientos } from '../components/HistorialMovimientos';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { getDireccion, getSucursalNombre, TELEFONO } from '../utils/ticketPrinter';
 
 const NEGOCIOS = [
@@ -589,7 +590,7 @@ ${fechaCierre}    ${sucursalNombre}
   };
 
   if (loading) {
-    return <Layout><div className="text-center py-8">Cargando...</div></Layout>;
+    return <Layout><LoadingSkeleton type="page" /></Layout>;
   }
 
   if (!canAccess) {

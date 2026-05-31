@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ConfirmProvider } from './contexts/ConfirmContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingSkeleton } from './components/LoadingSkeleton';
 import { LoginPage } from './pages/LoginPage';
 import { VentasPage } from './pages/VentasPage';
 import { StockPage } from './pages/StockPage';
@@ -14,11 +16,7 @@ const PrivateRoute = ({ children, requiredRole }) => {
   const { user, userRole, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Cargando...</div>
-      </div>
-    );
+    return <LoadingSkeleton type="page" />;
   }
 
   if (!user) {
@@ -57,6 +55,7 @@ function App() {
     <ToastProvider>
       <ConfirmProvider>
         <AuthProvider>
+          <ErrorBoundary>
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
@@ -85,6 +84,7 @@ function App() {
               <Route path="/" element={<Navigate to="/login" />} />
             </Routes>
           </BrowserRouter>
+          </ErrorBoundary>
         </AuthProvider>
       </ConfirmProvider>
     </ToastProvider>

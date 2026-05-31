@@ -7,6 +7,8 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
+import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
 
 export const StockPage = () => {
@@ -154,7 +156,7 @@ export const StockPage = () => {
   );
 
   if (loading) {
-    return <Layout><div className="text-center py-8">Cargando...</div></Layout>;
+    return <Layout><LoadingSkeleton type="page" /></Layout>;
   }
 
   return (
@@ -263,7 +265,7 @@ export const StockPage = () => {
           </tbody>
         </table>
         {productosFiltrados.length === 0 && (
-          <p className="text-center py-4 text-gray-500">No hay productos</p>
+          <EmptyState title="No hay productos" icon="📦" />
         )}
       </div>
 

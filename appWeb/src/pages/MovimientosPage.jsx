@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
+import { EmptyState } from '../components/EmptyState';
 
 export const MovimientosPage = () => {
   const { user } = useAuth();
@@ -184,7 +186,7 @@ export const MovimientosPage = () => {
   };
 
   if (loading) {
-    return <Layout><div className="text-center py-8">Cargando...</div></Layout>;
+    return <Layout><LoadingSkeleton type="page" /></Layout>;
   }
 
   return (
@@ -221,9 +223,9 @@ export const MovimientosPage = () => {
           <h3 className="text-lg font-semibold">Historial de Movimientos</h3>
         </div>
         {cargandoHistorial ? (
-          <div className="text-center py-8 text-gray-500">Cargando historial...</div>
+                <LoadingSkeleton type="table" rows={4} />
         ) : movimientos.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">No hay movimientos registrados</div>
+          <EmptyState title="No hay movimientos registrados" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

@@ -10,6 +10,8 @@ import { BuscadorProductos } from '../components/BuscadorProductos';
 import { CarritoVentas } from '../components/CarritoVentas';
 import { imprimirTicketAFavor, imprimirTicketVenta } from '../utils/ticketPrinter';
 import { Modal } from '../components/Modal';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
+import { EmptyState } from '../components/EmptyState';
 
 const FIREBASE_FUNCTIONS_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL;
 const AFIP_PTO_VTA = parseInt(import.meta.env.VITE_AFIP_PTO_VTA) || 9;
@@ -469,7 +471,7 @@ export const VentasPage = () => {
   const productosFiltrados = busqueda ? buscarProducto(busqueda) : [];
 
   if (loading) {
-    return <Layout><div className="text-center py-8">Cargando...</div></Layout>;
+    return <Layout><LoadingSkeleton type="page" /></Layout>;
   }
 
   if (!canSell) {
