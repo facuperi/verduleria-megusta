@@ -1,7 +1,7 @@
 import { EmptyState } from './EmptyState';
 
 export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETIRO_FIJOS, tiposRetiroPersonalizados, handleOpenEdit, handleEliminarVenta, ventasBrutas, notaCreditoTotal, efectivoCaja }) => {
-  if (ventasHoy.length === 0) {
+  if (ventasHoy.length === 0 && retiros.length === 0) {
     return <EmptyState title="No hay movimientos aún" />;
   }
 
@@ -25,20 +25,20 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
               if (item.monto !== undefined && item.tipo) {
                 const tipoRetiro = TIPOS_RETIRO_FIJOS.find(t => t.id === item.tipo) || tiposRetiroPersonalizados.find(t => t.id === item.tipo);
                 return (
-                  <tr key={item.id} className="border-b bg-orange-50">
-                    <td className="py-2 whitespace-nowrap">
+                  <tr key={item.id} className="border-b bg-orange-50 dark:bg-red-950">
+                    <td className="py-2 whitespace-nowrap text-gray-800 dark:text-gray-300">
                       {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </td>
                     <td className="py-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-red-950 dark:text-orange-300">
                         💸 {tipoRetiro?.nombre || item.tipo}
                       </span>
                     </td>
-                    <td className="py-2 font-bold text-red-700">
+                    <td className="py-2 font-bold text-red-700 dark:text-red-400">
                       -${item.monto.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                     </td>
-                    <td className="py-2 capitalize text-gray-600">-</td>
-                    <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
+                    <td className="py-2 capitalize text-gray-300 dark:text-gray-500">-</td>
+                    <td className="py-2 text-gray-400 dark:text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
                     {isGerente && <td className="py-2"></td>}
                   </tr>
                 );
@@ -54,13 +54,13 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
                 : (esMixta ? 'Mixta' : 'Venta');
 
               return (
-                <tr key={item.id} className={`border-b ${esNotaCredito ? 'bg-red-50' : 'bg-green-50'}`}>
+                <tr key={item.id} className={`border-b ${esNotaCredito ? 'bg-red-900/20' : 'bg-green-900/20'}`}>
                   <td className="py-2 whitespace-nowrap">
                     {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                   </td>
                   <td className="py-2">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      esNotaCredito ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      esNotaCredito ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                     }`}>
                       {esNotaCredito ? '⬇️' : '⬆️'} {tipoLabel}
                     </span>
@@ -69,7 +69,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
                     {esNotaCredito && <span className="text-red-500 mr-1">-</span>}
                     ${montoMostrar.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                   </td>
-                  <td className="py-2 text-gray-600">
+                  <td className="py-2 text-gray-300">
                     {item.tipoPago?.map(p => {
                       const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP', cuentadni: 'DNI' };
                       return nombres[p] || p;
@@ -83,7 +83,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
                       return descTotal > 0 ? <span className="text-green-600 text-xs ml-1">(Desc: -${descTotal.toLocaleString('es-AR')})</span> : null;
                     })()}
                   </td>
-                  <td className="py-2 text-gray-500 max-w-xs truncate">{item.observacion || '-'}</td>
+                  <td className="py-2 text-gray-400 max-w-xs truncate">{item.observacion || '-'}</td>
                   {isGerente && (
                     <td className="py-2 text-right whitespace-nowrap">
                       <button
@@ -93,7 +93,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
                       >✏️</button>
                       <button
                         onClick={() => handleEliminarVenta(item)}
-                        className="text-red-600 hover:text-red-800 text-xs"
+                        className="text-red-400 hover:text-red-300 text-xs"
                         title="Eliminar"
                       >🗑️</button>
                     </td>
@@ -102,7 +102,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, isGerente, TIPOS_RETI
               );
             })}
         </tbody>
-        <tfoot className="bg-gray-100 font-semibold">
+        <tfoot className="bg-gray-700 font-semibold">
           <tr>
             <td className="py-2 pl-2">TOTALES</td>
             <td className="py-2"></td>

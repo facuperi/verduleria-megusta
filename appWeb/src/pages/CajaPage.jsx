@@ -608,7 +608,7 @@ ${fechaCierre}    ${sucursalNombre}
   if (!canAccess) {
     return (
       <Layout>
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
           {restriction.message || 'La caja solo puede abrirse desde PC'}
         </div>
       </Layout>
@@ -627,28 +627,28 @@ ${fechaCierre}    ${sucursalNombre}
           <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => setSelectedNegocio('chiclana')}
-              className="bg-white p-8 rounded-xl shadow hover:shadow-lg hover:bg-indigo-50 transition-all border-2 border-transparent hover:border-indigo-300"
+              className="bg-gray-800/50 p-8 rounded-xl shadow-sm border border-gray-700/50 hover:shadow-sm hover:bg-indigo-900/30 transition-all border-2 border-transparent hover:border-indigo-300"
             >
               <span className="text-4xl block mb-3">🏪</span>
               <span className="text-lg font-bold">Chiclana</span>
-              <span className="text-sm text-gray-500 block mt-1">{getDireccion('chiclana')}</span>
+              <span className="text-sm text-gray-400 block mt-1">{getDireccion('chiclana')}</span>
             </button>
             <button
               onClick={() => setSelectedNegocio('belgrano')}
-              className="bg-white p-8 rounded-xl shadow hover:shadow-lg hover:bg-indigo-50 transition-all border-2 border-transparent hover:border-indigo-300"
+              className="bg-gray-800/50 p-8 rounded-xl shadow-sm border border-gray-700/50 hover:shadow-sm hover:bg-indigo-900/30 transition-all border-2 border-transparent hover:border-indigo-300"
             >
               <span className="text-4xl block mb-3">🏪</span>
               <span className="text-lg font-bold">Belgrano</span>
-              <span className="text-sm text-gray-500 block mt-1">{getDireccion('belgrano')}</span>
+              <span className="text-sm text-gray-400 block mt-1">{getDireccion('belgrano')}</span>
             </button>
           </div>
         </div>
       ) : !caja ? (
         <div className="max-w-md mx-auto">
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-gray-800/50 p-6 rounded-lg shadow-sm border border-gray-700/50">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Apertura de Caja</h3>
-              <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium capitalize">{selectedNegocio}</span>
+              <span className="bg-indigo-900/30 text-indigo-300 px-3 py-1 rounded-full text-sm font-medium capitalize">{selectedNegocio}</span>
             </div>
 
             <div className="mb-4">
@@ -658,7 +658,7 @@ ${fechaCierre}    ${sucursalNombre}
                 step="0.01"
                 value={saldoApertura}
                 onChange={(e) => setSaldoApertura(e.target.value)}
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
                 placeholder="0.00"
               />
             </div>
@@ -673,7 +673,7 @@ ${fechaCierre}    ${sucursalNombre}
 
             <button
               onClick={clearSelectedNegocio}
-              className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
+              className="w-full text-sm text-gray-400 hover:text-gray-200 py-1"
             >
               ← Cambiar de negocio
             </button>
@@ -684,32 +684,32 @@ ${fechaCierre}    ${sucursalNombre}
           <div className="flex justify-end">
             <button
               onClick={clearSelectedNegocio}
-              className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+              className="text-sm text-indigo-400 hover:text-indigo-300 underline"
             >
               ← Cambiar de negocio
             </button>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
+            <div className="lg:col-span-2 bg-gray-800/50 p-6 rounded-lg shadow-sm border border-gray-700/50">
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-xl font-semibold">Caja Abierta</h3>
-                  <p className="text-sm text-gray-500">Negocio: <span className="font-semibold capitalize">{caja.sucursal}</span></p>
+                  <p className="text-sm text-gray-400">Negocio: <span className="font-semibold capitalize">{caja.sucursal}</span></p>
                 </div>
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Abierta</span>
+                <span className="bg-green-900/20 text-green-300 px-3 py-1 rounded-full text-sm">Abierta</span>
               </div>
               
               <ResumenCaja caja={caja} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} ventaNeta={ventaNeta} efectivoCaja={efectivoCaja} ventasEfectivo={ventasEfectivo} ventasTarjeta={ventasTarjeta} ventasDebito={ventasDebito} ventasMercadoPago={ventasMercadoPago} ventasCuentaDNI={ventasCuentaDNI} />
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow">
+            <div className="bg-gray-800/50 p-6 rounded-lg shadow-sm border border-gray-700/50">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold">Cierre de Caja</h3>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMostrarModalRetiro(true)}
                     disabled={!efectivoCaja || efectivoCaja <= 0}
-                    className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 disabled:opacity-50"
+                    className="text-sm bg-red-900/20 text-red-300 px-3 py-1 rounded hover:bg-red-800 disabled:opacity-50"
                     title="Nuevo Retiro"
                   >
                     💸 Nuevo Retiro
@@ -724,14 +724,14 @@ ${fechaCierre}    ${sucursalNombre}
                   step="0.01"
                   value={saldoCierre}
                   onChange={(e) => setSaldoCierre(e.target.value)}
-                  className="w-full border p-2 rounded"
+                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
                   placeholder="0.00"
                 />
               </div>
 
               {saldoCierre && (
-                <div className="mb-4 p-3 bg-yellow-50 rounded text-sm">
-                  <p>Diferencia: <span className={`font-semibold ${diferencia === 0 ? 'text-green-600' : 'text-red-600'}`}>${diferencia}</span></p>
+                <div className="mb-4 p-3 bg-yellow-900/20 rounded text-sm">
+                  <p>Diferencia: <span className={`font-semibold ${diferencia === 0 ? 'text-green-400' : 'text-red-400'}`}>${diferencia}</span></p>
                 </div>
               )}
 
@@ -745,7 +745,7 @@ ${fechaCierre}    ${sucursalNombre}
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-gray-800/50 p-6 rounded-lg shadow-sm border border-gray-700/50">
             <h3 className="text-xl font-semibold mb-4">Historial de Movimientos</h3>
             <HistorialMovimientos ventasHoy={ventasHoy} retiros={retiros} isGerente={isGerente} TIPOS_RETIRO_FIJOS={TIPOS_RETIRO_FIJOS} tiposRetiroPersonalizados={tiposRetiroPersonalizados} handleOpenEdit={handleOpenEdit} handleEliminarVenta={handleEliminarVenta} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} efectivoCaja={efectivoCaja} />
           </div>
@@ -765,7 +765,7 @@ ${fechaCierre}    ${sucursalNombre}
                   setTipoRetiro(e.target.value);
                 }
               }}
-              className="flex-1 border p-2 rounded"
+              className="flex-1 border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               <option value="">-- Seleccionar --</option>
               {TIPOS_RETIRO_FIJOS.map(t => (
@@ -788,7 +788,7 @@ ${fechaCierre}    ${sucursalNombre}
             step="0.01"
             value={montoRetiro}
             onChange={(e) => setMontoRetiro(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             placeholder="0.00"
           />
         </div>
@@ -798,7 +798,7 @@ ${fechaCierre}    ${sucursalNombre}
           <textarea
             value={observacionRetiro}
             onChange={(e) => setObservacionRetiro(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             placeholder="Ej: Limpieza, retiro para caja fuerte..."
             rows={2}
           />
@@ -819,7 +819,7 @@ ${fechaCierre}    ${sucursalNombre}
               setMontoRetiro('');
               setObservacionRetiro('');
             }}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700"
           >
             Cancelar
           </button>
@@ -833,7 +833,7 @@ ${fechaCierre}    ${sucursalNombre}
             type="text"
             value={nombreNuevoTipo}
             onChange={(e) => setNombreNuevoTipo(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             placeholder="Ej: Gasto Diario"
           />
         </div>
@@ -843,7 +843,7 @@ ${fechaCierre}    ${sucursalNombre}
           <select
             value={iconoNuevoTipo}
             onChange={(e) => setIconoNuevoTipo(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           >
             <option value="💰">💰 Dinero</option>
             <option value="🧹">🧹 Limpieza</option>
@@ -870,7 +870,7 @@ ${fechaCierre}    ${sucursalNombre}
               setNombreNuevoTipo('');
               setIconoNuevoTipo('💰');
             }}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700"
           >
             Cancelar
           </button>
@@ -885,46 +885,46 @@ ${fechaCierre}    ${sucursalNombre}
         </div>
         
         <div className="p-5">
-          <div className="bg-gray-50 rounded-lg p-4 mb-5">
-            <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <div className="bg-gray-800 rounded-lg p-4 mb-5">
+            <h3 className="font-semibold text-gray-200 mb-3 flex items-center gap-2">
               📊 Resumen del Día
             </h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Ventas Brutas:</span>
+                <span className="text-gray-300">Ventas Brutas:</span>
                 <span className="font-medium">${ventasBrutas.toLocaleString('es-AR')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Notas Crédito:</span>
-                <span className="font-medium text-red-600">-${notaCreditoTotal.toLocaleString('es-AR')}</span>
+                <span className="text-gray-300">Notas Crédito:</span>
+                <span className="font-medium text-red-400">-${notaCreditoTotal.toLocaleString('es-AR')}</span>
               </div>
-              <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+              <div className="border-t border-gray-700/50 pt-2 mt-2 flex justify-between font-bold">
                 <span>💰 VENTA NETA:</span>
-                <span className="text-green-600">${ventaNeta.toLocaleString('es-AR')}</span>
+                <span className="text-green-400">${ventaNeta.toLocaleString('es-AR')}</span>
               </div>
             </div>
           </div>
           
-          <div className="bg-gray-50 rounded-lg p-4 mb-5">
+          <div className="bg-gray-800 rounded-lg p-4 mb-5">
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Efectivo en Caja:</span>
+                <span className="text-gray-300">Efectivo en Caja:</span>
                 <span className="font-medium">${efectivoCaja.toLocaleString('es-AR')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Saldo Sistema:</span>
+                <span className="text-gray-300">Saldo Sistema:</span>
                 <span className="font-medium">${saldoSistema.toLocaleString('es-AR')}</span>
               </div>
-              <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+              <div className="border-t border-gray-700/50 pt-2 mt-2 flex justify-between font-bold">
                 <span>Diferencia:</span>
-                <span className={diferencia === 0 ? 'text-green-600' : 'text-red-600'}>
+                <span className={diferencia === 0 ? 'text-green-400' : 'text-red-400'}>
                   ${diferencia.toLocaleString('es-AR')}
                 </span>
               </div>
             </div>
             
             {diferencia !== 0 && (
-              <div className="mt-3 p-2 bg-red-100 text-red-700 text-xs rounded flex items-center gap-1">
+              <div className="mt-3 p-2 bg-red-900/20 text-red-300 text-xs rounded flex items-center gap-1">
                 ⚠️ La diferencia no coincide con el saldo del sistema
               </div>
             )}
@@ -949,7 +949,7 @@ ${fechaCierre}    ${sucursalNombre}
             
             <button
               onClick={() => setMostrarModalCierre(false)}
-              className="w-full border border-gray-300 text-gray-600 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors"
+              className="w-full border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors"
             >
               Cancelar
             </button>
@@ -965,7 +965,7 @@ ${fechaCierre}    ${sucursalNombre}
             step="0.01"
             value={nuevoTotal}
             onChange={(e) => setNuevoTotal(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           />
         </div>
 
@@ -1000,7 +1000,7 @@ ${fechaCierre}    ${sucursalNombre}
             value={motivoEdicion}
             onChange={(e) => setMotivoEdicion(e.target.value)}
             placeholder="Ej: Cliente pagó con tarjeta, no efectivo"
-            className="w-full border p-2 rounded text-sm"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded text-sm"
             rows={2}
           />
         </div>
@@ -1015,7 +1015,7 @@ ${fechaCierre}    ${sucursalNombre}
           </button>
           <button
             onClick={() => setEditandoVenta(null)}
-            className="px-4 py-2 border rounded hover:bg-gray-50 font-medium"
+            className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700 font-medium"
           >
             Cancelar
           </button>

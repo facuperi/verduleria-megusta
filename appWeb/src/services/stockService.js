@@ -8,10 +8,4 @@ export const getMovimientos = (db) => getDocs(query(
   limit(100)
 ));
 
-export const addIngreso = (db, data) => addDoc(collection(db, 'ingresosMercaderia'), data);
 
-export const getIngresos = (db) => getDocs(query(
-  collection(db, 'ingresosMercaderia'),
-  orderBy('fecha', 'desc'),
-  limit(100)
-));

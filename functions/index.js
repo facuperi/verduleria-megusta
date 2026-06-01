@@ -218,3 +218,85 @@ exports.facturarVenta = functions.https.onRequest({
     return res.status(500).json({ error: error.message });
   }
 });
+
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+
+exports.crearUsuario = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Debes iniciar sesión');
+  }
+
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+  if (!callerDoc.exists || callerDoc.data().rol !== 'gerente') {
+    throw new HttpsError('permission-denied', 'Solo gerentes pueden crear usuarios');
+  }
+
+  const { id, nombre, password, rol } = request.data;
+  if (!id || !nombre || !password) {
+    throw new HttpsError('invalid-argument', 'Faltan datos obligatorios');
+  }
+
+  const idNormalizado = id.toLowerCase().trim();
+  const email = `${idNormalizado}@santos.com`;
+
+  const existingUsers = await admin.firestore()
+    .collection('users')
+    .where('id', '==', idNormalizado)
+    .get();
+
+  if (!existingUsers.empty) {
+    throw new HttpsError('already-exists', 'Ya existe un usuario con ese ID');
+  }
+
+  let user;
+  try {
+    user = await admin.auth().createUser({ email, password, displayName: nombre });
+  } catch (authErr) {
+    if (authErr.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'Ese ID ya está registrado en el sistema');
+    }
+    throw new HttpsError('internal', 'Error al crear el usuario: ' + authErr.message);
+  }
+
+  try {
+    await admin.firestore().collection('users').doc(user.uid).set({
+      id: idNormalizado,
+      nombre,
+      rol: rol || 'empleado',
+      activo: true,
+      creadoPor: callerUid,
+      creadoEn: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (firestoreErr) {
+    await admin.auth().deleteUser(user.uid);
+    throw new HttpsError('internal', 'Error al guardar el usuario: ' + firestoreErr.message);
+  }
+
+  return { uid: user.uid };
+});
+
+exports.actualizarPassword = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Debes iniciar sesión');
+  }
+
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+  if (!callerDoc.exists || callerDoc.data().rol !== 'gerente') {
+    throw new HttpsError('permission-denied', 'Solo gerentes pueden cambiar contraseñas');
+  }
+
+  const { uid, newPassword } = request.data;
+  if (!uid || !newPassword) {
+    throw new HttpsError('invalid-argument', 'Faltan datos obligatorios');
+  }
+
+  if (newPassword.length < 6) {
+    throw new HttpsError('invalid-argument', 'La contraseña debe tener al menos 6 caracteres');
+  }
+
+  await admin.auth().updateUser(uid, { password: newPassword });
+
+  return { success: true };
+});

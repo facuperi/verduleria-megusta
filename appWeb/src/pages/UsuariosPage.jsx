@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { db, auth } from '../lib/firebase';
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
@@ -12,7 +12,7 @@ import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
 
 export const UsuariosPage = () => {
-  const { isGerente, user } = useAuth();
+  const { isGerente } = useAuth();
   const { isMobile } = useDevice();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -20,7 +20,13 @@ export const UsuariosPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
-  const [formData, setFormData] = useState({ email: '', password: '', nombre: '', rol: 'empleado', activo: true });
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({ id: '', password: '', nombre: '', rol: 'empleado', activo: true });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const restriction = checkDeviceRestriction('gestionarUsuarios');
   const canAccess = !isMobile && isGerente;
@@ -29,7 +35,7 @@ export const UsuariosPage = () => {
     const fetchUsuarios = async () => {
       try {
         const snapshot = await getDocs(collection(db, 'users'));
-        setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setUsuarios(snapshot.docs.map(doc => ({ _uid: doc.id, ...doc.data() })));
       } catch (err) {
         console.error(err);
       } finally {
@@ -41,32 +47,86 @@ export const UsuariosPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     try {
       if (editando) {
-        await updateDoc(doc(db, 'users', editando.id), {
+        await updateDoc(doc(db, 'users', editando._uid), {
           nombre: formData.nombre,
           rol: formData.rol,
           activo: formData.activo,
         });
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          email: formData.email,
+        const idNormalizado = formData.id.trim().toLowerCase();
+
+        if (formData.password.length < 6) {
+          showToast('La contraseña debe tener al menos 6 caracteres', 'error');
+          setSubmitting(false);
+          return;
+        }
+
+        const crearUsuario = httpsCallable(functions, 'crearUsuario');
+        await crearUsuario({
+          id: idNormalizado,
           nombre: formData.nombre,
+          password: formData.password,
           rol: formData.rol,
-          activo: true,
-          creadoPor: user.uid,
-          creadoEn: new Date().toISOString(),
         });
       }
       setShowModal(false);
       setEditando(null);
-      setFormData({ email: '', password: '', nombre: '', rol: 'empleado', activo: true });
+      setFormData({ id: '', password: '', nombre: '', rol: 'empleado', activo: true });
       
       const snapshot = await getDocs(collection(db, 'users'));
       setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
-      showToast('Error al guardar usuario: ' + err.message, 'error');
+      const code = err.code?.split('/').pop() || err.message;
+      if (code === 'already-exists') {
+        showToast('Ese ID ya está registrado en el sistema', 'error');
+      } else if (code === 'permission-denied') {
+        showToast('No tenés permisos de gerente para crear usuarios', 'error');
+      } else {
+        showToast('Error al guardar usuario: ' + err.message, 'error');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const abrirCambiarPassword = (usuario) => {
+    setPasswordTarget(usuario);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (changingPassword) return;
+    if (newPassword.length < 6) {
+      showToast('La contraseña debe tener al menos 6 caracteres', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Las contraseñas no coinciden', 'error');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const fn = httpsCallable(functions, 'actualizarPassword');
+      await fn({ uid: passwordTarget._uid, newPassword });
+      showToast('Contraseña actualizada', 'success');
+      setShowPasswordModal(false);
+      setPasswordTarget(null);
+    } catch (err) {
+      const code = err.code?.split('/').pop();
+      if (code === 'permission-denied') {
+        showToast('No tenés permisos de gerente para cambiar contraseñas', 'error');
+      } else {
+        showToast('Error al cambiar contraseña: ' + err.message, 'error');
+      }
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -84,7 +144,7 @@ export const UsuariosPage = () => {
 
   const abrirEditar = (usuario) => {
     setEditando(usuario);
-    setFormData({ nombre: usuario.nombre, rol: usuario.rol, email: '', password: '', activo: usuario.activo !== false });
+    setFormData({ nombre: usuario.nombre, rol: usuario.rol, id: '', password: '', activo: usuario.activo !== false });
     setShowModal(true);
   };
 
@@ -95,7 +155,7 @@ export const UsuariosPage = () => {
   if (!canAccess) {
     return (
       <Layout>
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
           {restriction.message}
         </div>
       </Layout>
@@ -107,38 +167,49 @@ export const UsuariosPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
         <button
-          onClick={() => { setShowModal(true); setEditando(null); setFormData({ email: '', password: '', nombre: '', rol: 'empleado', activo: true }); }}
+          onClick={() => { setShowModal(true); setEditando(null); setFormData({ id: '', password: '', nombre: '', rol: 'empleado', activo: true }); }}
           className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
         >
           Agregar Usuario
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50 overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-100">
+          <thead className="bg-gray-700">
             <tr>
               <th className="px-4 py-2 text-left">Nombre</th>
-              <th className="px-4 py-2 text-left">Email</th>
+              <th className="px-4 py-2 text-left">ID de usuario</th>
               <th className="px-4 py-2 text-left">Rol</th>
+              <th className="px-4 py-2 text-left">Contraseña</th>
               <th className="px-4 py-2 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {usuarios.map(usuario => (
-              <tr key={usuario.id} className="border-t">
+              <tr key={usuario._uid} className="border-t border-gray-700/50">
                 <td className="px-4 py-2">{usuario.nombre}</td>
-                <td className="px-4 py-2">{usuario.email}</td>
+                <td className="px-4 py-2">{usuario.id || usuario.email}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded text-sm ${usuario.rol === 'gerente' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                  <span className={`px-2 py-1 rounded text-sm ${usuario.rol === 'gerente' ? 'bg-purple-900/30 text-purple-300' : 'bg-blue-900/30 text-blue-300'}`}>
                     {usuario.rol}
                   </span>
                 </td>
+                <td className="px-4 py-2">
+                  <span className="text-gray-400 tracking-widest">••••••••</span>
+                  <button
+                    onClick={() => abrirCambiarPassword(usuario)}
+                    className="ml-2 text-gray-400 hover:text-indigo-400"
+                    title="Cambiar contraseña"
+                  >
+                    ✏️
+                  </button>
+                </td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => abrirEditar(usuario)} className="text-blue-600 hover:text-blue-800 mr-2">
+                  <button onClick={() => abrirEditar(usuario)} className="text-blue-400 hover:text-blue-300 mr-2">
                     Editar
                   </button>
-                  <button onClick={() => eliminarUsuario(usuario.id)} className="text-red-600 hover:text-red-800">
+                   <button onClick={() => eliminarUsuario(usuario._uid)} className="text-red-400 hover:text-red-300">
                     Eliminar
                   </button>
                 </td>
@@ -159,19 +230,20 @@ export const UsuariosPage = () => {
               type="text"
               value={formData.nombre}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               required
             />
           </div>
           {!editando && (
             <>
               <div className="mb-4">
-                <label className="block text-sm font-bold mb-1">Email</label>
+                <label className="block text-sm font-bold mb-1">ID de usuario</label>
                 <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full border p-2 rounded"
+                  type="text"
+                  value={formData.id}
+                  onChange={(e) => setFormData({ ...formData, id: e.target.value })}
+                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+                  placeholder="ej: juan, maria123"
                   required
                 />
               </div>
@@ -181,7 +253,7 @@ export const UsuariosPage = () => {
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full border p-2 rounded"
+                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
                   required
                 />
               </div>
@@ -192,17 +264,52 @@ export const UsuariosPage = () => {
             <select
               value={formData.rol}
               onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               <option value="empleado">Empleado</option>
               <option value="gerente">Gerente</option>
             </select>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded flex-1">
-              Guardar
+            <button type="submit" disabled={submitting} className={`${submitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-4 py-2 rounded flex-1`}>
+              {submitting ? 'Guardando...' : 'Guardar'}
             </button>
-            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded">
+            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-600 px-4 py-2 rounded">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={showPasswordModal} onClose={() => setShowPasswordModal(false)} title={`Cambiar contraseña - ${passwordTarget?.nombre || ''}`}>
+        <form onSubmit={handlePasswordChange}>
+          <div className="mb-4">
+            <label className="block text-sm font-bold mb-1">Nueva contraseña</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              required
+              minLength={6}
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-bold mb-1">Confirmar contraseña</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              required
+              minLength={6}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={changingPassword} className={`${changingPassword ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-4 py-2 rounded flex-1`}>
+              {changingPassword ? 'Guardando...' : 'Guardar'}
+            </button>
+            <button type="button" onClick={() => setShowPasswordModal(false)} className="bg-gray-600 px-4 py-2 rounded">
               Cancelar
             </button>
           </div>

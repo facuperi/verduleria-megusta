@@ -167,7 +167,7 @@ export const StockPage = () => {
           {isGerente && (
             <button
               onClick={() => setMostrarGlobal(!mostrarGlobal)}
-              className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-gray-200'}`}
+              className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
             >
               {mostrarGlobal ? 'Ver por Negocio' : 'Ver Global'}
             </button>
@@ -197,13 +197,13 @@ export const StockPage = () => {
           placeholder="Buscar por nombre, código de barras o código interno..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50 overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-100">
+          <thead className="bg-gray-700">
             <tr>
               <th className="px-4 py-2 text-left">Código</th>
               <th className="px-4 py-2 text-left">Nombre</th>
@@ -223,12 +223,12 @@ export const StockPage = () => {
           </thead>
           <tbody>
             {productosFiltrados.map(producto => (
-              <tr key={producto.id} className="border-t">
+              <tr key={producto.id} className="border-t border-gray-700/50">
                 <td className="px-4 py-2 text-sm">{producto.codigoInterno}</td>
                 <td className="px-4 py-2">{producto.nombre}</td>
                 <td className="px-4 py-2 text-right">
                   <span className="block">EF: ${producto.precioEfectivo}</span>
-                  <span className="text-gray-500 text-sm">TJ: ${producto.precioTarjeta}</span>
+                  <span className="text-gray-400 text-sm">TJ: ${producto.precioTarjeta}</span>
                 </td>
                 {mostrarGlobal ? (
                   <td className="px-4 py-2 text-center">
@@ -252,10 +252,10 @@ export const StockPage = () => {
                 )}
                 {puedeEditar && (
                   <td className="px-4 py-2 text-right">
-                    <button onClick={() => abrirEditar(producto)} className="text-blue-600 hover:text-blue-800 mr-2">
+                    <button onClick={() => abrirEditar(producto)} className="text-blue-400 hover:text-blue-300 mr-2">
                       Editar
                     </button>
-                    <button onClick={() => eliminarProducto(producto.id)} disabled={eliminando} className="text-red-600 hover:text-red-800 disabled:opacity-50">
+                    <button onClick={() => eliminarProducto(producto.id)} disabled={eliminando} className="text-red-400 hover:text-red-300 disabled:opacity-50">
                       {eliminando ? '...' : 'Eliminar'}
                     </button>
                   </td>
@@ -277,7 +277,7 @@ export const StockPage = () => {
               type="text"
               value={formData.codigoBarras}
               onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               placeholder="Escanear o ingresar"
             />
           </div>
@@ -287,7 +287,7 @@ export const StockPage = () => {
               type="text"
               value={formData.codigoInterno}
               onChange={(e) => setFormData({ ...formData, codigoInterno: e.target.value })}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               required
             />
           </div>
@@ -297,7 +297,7 @@ export const StockPage = () => {
               type="text"
               value={formData.nombre}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               required
             />
           </div>
@@ -309,7 +309,7 @@ export const StockPage = () => {
                 step="0.01"
                 value={formData.precioEfectivo}
                 onChange={(e) => setFormData({ ...formData, precioEfectivo: e.target.value })}
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
                 required
               />
             </div>
@@ -320,7 +320,7 @@ export const StockPage = () => {
                 step="0.01"
                 value={formData.precioTarjeta}
                 onChange={(e) => setFormData({ ...formData, precioTarjeta: e.target.value })}
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
                 required
               />
             </div>
@@ -332,7 +332,7 @@ export const StockPage = () => {
                 type="number"
                 value={formData.stockChiclana}
                 onChange={(e) => setFormData({ ...formData, stockChiclana: e.target.value })}
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               />
             </div>
             <div>
@@ -341,18 +341,18 @@ export const StockPage = () => {
                 type="number"
                 value={formData.stockBelgrano}
                 onChange={(e) => setFormData({ ...formData, stockBelgrano: e.target.value })}
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               />
             </div>
           </div>
-          <div className="bg-gray-100 p-2 rounded mb-3 text-sm text-center">
+          <div className="bg-gray-700 p-2 rounded mb-3 text-sm text-center">
             Stock Global: {calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano)}
           </div>
           <div className="flex gap-2">
             <button type="submit" disabled={procesando} className="bg-indigo-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
               {procesando ? 'Guardando...' : 'Guardar'}
             </button>
-            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded">
+            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-600 px-4 py-2 rounded">
               Cancelar
             </button>
           </div>

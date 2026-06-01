@@ -115,12 +115,34 @@ export const VentasPage = () => {
   const totalConDescuento = Math.max(0, diferencia - totalDescuentos);
 
   useEffect(() => {
-    if (carrito.length > 0 && diferencia > 0) {
-      setPagosSeleccionados([{ metodo: 'efectivo', monto: diferencia, descuentoTipo: null, descuentoValor: 0 }]);
-    } else if (carrito.length > 0 && diferencia <= 0) {
-      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
-    }
+    if (carrito.length === 0) return;
+    setPagosSeleccionados(prev => {
+      if (prev.length === 0) {
+        return [{ metodo: 'efectivo', monto: Math.max(0, diferencia), descuentoTipo: null, descuentoValor: 0 }];
+      }
+      const target = Math.max(0, diferencia);
+      const sumActual = prev.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
+      if (Math.abs(sumActual - target) < 0.01) return prev;
+      const diff = Math.round((target - sumActual) * 100) / 100;
+      const updated = [...prev];
+      const nuevo = Math.max(0, Math.round(((parseFloat(prev[0].monto) || 0) + diff) * 100) / 100);
+      updated[0] = { ...updated[0], monto: nuevo };
+      return updated;
+    });
   }, [carrito.length, diferencia]);
+
+  const tienePagoTarjeta = pagosSeleccionados.some(p => p.metodo === 'tarjeta');
+
+  useEffect(() => {
+    setCarrito(prev => {
+      if (prev.length === 0) return prev;
+      const todosBien = prev.every(p =>
+        tienePagoTarjeta ? p.precioSeleccionado === 'tarjeta' : p.precioSeleccionado === 'efectivo'
+      );
+      if (todosBien) return prev;
+      return prev.map(p => ({ ...p, precioSeleccionado: tienePagoTarjeta ? 'tarjeta' : 'efectivo' }));
+    });
+  }, [tienePagoTarjeta]);
   
   const restriction = checkDeviceRestriction('venta');
   const canSell = !isMobile || restriction.allowed.includes('mobile');
@@ -273,11 +295,14 @@ export const VentasPage = () => {
 
   const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
 
-  const cambiarTipoPrecio = (index, nuevoTipo) => {
-    setCarrito(carrito.map((p, i) =>
-      i === index ? { ...p, precioSeleccionado: nuevoTipo } : p
-    ));
+  const handleTogglePrecioGlobal = () => {
+    setCarrito(prev => prev.map(p => ({
+      ...p,
+      precioSeleccionado: p.precioSeleccionado === 'tarjeta' ? 'efectivo' : 'tarjeta'
+    })));
   };
+
+  const tipoPrecioGlobal = carrito.some(p => p.precioSeleccionado === 'tarjeta') ? 'tarjeta' : 'efectivo';
 
   const handleFacturarManual = async () => {
     if (!ventaExitosa) return;
@@ -569,7 +594,7 @@ export const VentasPage = () => {
   if (!canSell) {
     return (
       <Layout>
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
           {restriction.message}
         </div>
       </Layout>
@@ -579,7 +604,7 @@ export const VentasPage = () => {
   return (
     <Layout>
       {!caja && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/20 border border-red-600 text-red-300 px-4 py-3 rounded mb-4">
           ⚠️ No hay caja abierta. <a href="/caja" className="underline font-semibold">Abrir caja</a> para poder vender.
         </div>
       )}
@@ -615,9 +640,10 @@ export const VentasPage = () => {
             totalDescuentos={totalDescuentos}
             totalConDescuento={totalConDescuento}
             error={error}
+            tipoPrecioGlobal={tipoPrecioGlobal}
             onCambiarCantidad={actualizarCantidad}
             onQuitarDelCarrito={quitarDelCarrito}
-            onCambiarTipoPrecio={cambiarTipoPrecio}
+            onTogglePrecioGlobal={handleTogglePrecioGlobal}
             onToggleNotaCredito={toggleNotaCredito}
             onPagoChange={handlePagoChange}
             onDescuentoTipo={handleDescuentoTipo}
@@ -630,7 +656,7 @@ export const VentasPage = () => {
           />
 
           {ventaExitosa && (
-            <div className="bg-green-50 border border-green-400 text-green-700 p-4 rounded-lg shadow mb-4">
+            <div className="bg-green-900/20 border border-green-600 text-green-300 p-4 rounded-lg shadow-sm mb-4">
               <div className="flex justify-between items-center">
                 <div>
                   <p className="font-bold">✅ Venta exitosa</p>
@@ -647,20 +673,20 @@ export const VentasPage = () => {
                 <div className="mt-2 flex gap-2">
                   <button
                     onClick={handleFacturaA}
-                    className="flex-1 bg-blue-100 text-blue-700 py-1 px-2 rounded text-xs hover:bg-blue-200"
+                    className="flex-1 bg-blue-900/30 text-blue-300 py-1 px-2 rounded text-xs hover:bg-blue-800"
                   >
                     📄 Factura A
                   </button>
                   <button
                     onClick={handleFacturarManual}
-                    className="flex-1 bg-gray-100 text-gray-700 py-1 px-2 rounded text-xs hover:bg-gray-200"
+                    className="flex-1 bg-gray-700 text-gray-200 py-1 px-2 rounded text-xs hover:bg-gray-600"
                   >
                     📄 Cons. Final
                   </button>
                 </div>
               )}
               {facturando && (
-                <p className="mt-2 text-sm text-blue-600">⏳ Generando factura...</p>
+                <p className="mt-2 text-sm text-blue-400">⏳ Generando factura...</p>
               )}
             </div>
           )}
@@ -677,14 +703,14 @@ export const VentasPage = () => {
               onChange={(e) => setCuitCliente(e.target.value.replace(/\D/g, ''))}
               placeholder="Ej: 20123456789"
               maxLength={11}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             />
-            <p className="text-xs text-gray-500 mt-1">Ingresá los 11 dígitos del CUIT</p>
+            <p className="text-xs text-gray-400 mt-1">Ingresá los 11 dígitos del CUIT</p>
           </div>
         )}
         
         {tipoFacturaSeleccionado === 'B' && (
-          <p className="mb-4 text-gray-600">Se generará una Factura B para consumidor final.</p>
+          <p className="mb-4 text-gray-300">Se generará una Factura B para consumidor final.</p>
         )}
         
         <div className="flex gap-2">
@@ -697,7 +723,7 @@ export const VentasPage = () => {
           </button>
           <button
             onClick={() => setMostrarModalFactura(false)}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700"
           >
             Cancelar
           </button>

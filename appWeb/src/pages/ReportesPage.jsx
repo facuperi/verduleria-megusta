@@ -384,7 +384,9 @@ export const ReportesPage = () => {
         const esNotaCredito = m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
         tipo = esNotaCredito ? 'Nota Crédito' : 'Venta';
         detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(', ');
-        monto = m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0);
+        monto = (m.pagos?.some(p => p.descuentoTipo)
+          ? m.pagos.reduce((s, p) => s + (p.monto || 0), 0)
+          : (m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0)));
       } else if (m.origen === 'retiros') {
         // Determinar nombre del tipo: si es fijo usar mapeo, si es personalizado buscar en Firestore
         let nombreTipo = m.tipo;
@@ -456,7 +458,7 @@ export const ReportesPage = () => {
   if (!canAccess) {
     return (
       <Layout>
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
           {restriction.message || 'Solo los gerentes pueden ver reportes desde PC'}
         </div>
       </Layout>
@@ -522,7 +524,7 @@ export const ReportesPage = () => {
       )}
 
       {!fechaDesde && !fechaHasta && (
-        <p className="text-center py-8 text-gray-500">Seleccioná un rango de fechas para buscar</p>
+        <p className="text-center py-8 text-gray-400">Seleccioná un rango de fechas para buscar</p>
       )}
     </Layout>
   );

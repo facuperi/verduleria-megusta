@@ -17,18 +17,25 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const role = userDoc.exists() ? userDoc.data().rol : 'empleado';
-        setUser({ ...firebaseUser, role });
-        setUserRole(role);
-      } else {
-        setUser(null);
-        setUserRole(null);
-        sessionStorage.removeItem('selectedNegocio');
-        setSelectedNegocioState(null);
+      try {
+        if (firebaseUser) {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const role = userDoc.exists() ? userDoc.data().rol : 'empleado';
+          setUser({ ...firebaseUser, role });
+          setUserRole(role);
+        } else {
+          setUser(null);
+          setUserRole(null);
+          sessionStorage.removeItem('selectedNegocio');
+          setSelectedNegocioState(null);
+        }
+      } catch (err) {
+        console.error('Error al cargar usuario:', err);
+        setUser(firebaseUser);
+        setUserRole('empleado');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return unsubscribe;

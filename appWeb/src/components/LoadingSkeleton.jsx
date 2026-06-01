@@ -1,5 +1,5 @@
 const SkeletonBar = ({ className = '' }) => (
-  <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  <div className={`animate-pulse bg-gray-700 rounded ${className}`} />
 );
 
 const TextSkeleton = ({ rows = 3 }) => (
@@ -13,7 +13,7 @@ const TextSkeleton = ({ rows = 3 }) => (
 const CardSkeleton = ({ count = 1 }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className="bg-white p-4 rounded-lg shadow space-y-3">
+      <div key={i} className="bg-gray-800 p-4 rounded-lg shadow space-y-3">
         <SkeletonBar className="h-4 w-1/2" />
         <SkeletonBar className="h-8 w-1/3" />
         <SkeletonBar className="h-3 w-2/3" />
@@ -23,7 +23,7 @@ const CardSkeleton = ({ count = 1 }) => (
 );
 
 const TableSkeleton = ({ rows = 5 }) => (
-  <div className="bg-white rounded-lg shadow overflow-hidden">
+  <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
     <div className="border-b p-4 space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex gap-4">
@@ -42,14 +42,14 @@ const PageSkeleton = () => (
     <SkeletonBar className="h-8 w-48" />
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="bg-white p-6 rounded-lg shadow">
+        <div key={i} className="bg-gray-800 p-6 rounded-lg shadow">
           <SkeletonBar className="h-4 w-1/2 mb-4" />
           <SkeletonBar className="h-8 w-1/3 mb-2" />
           <SkeletonBar className="h-3 w-2/3" />
         </div>
       ))}
     </div>
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="bg-gray-800 p-6 rounded-lg shadow">
       <SkeletonBar className="h-4 w-1/4 mb-4" />
       {Array.from({ length: 4 }).map((_, i) => (
         <SkeletonBar key={i} className="h-4 w-full mb-3" />

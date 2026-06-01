@@ -56,7 +56,7 @@ export const FiltrosReportes = ({
   );
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow mb-6">
+    <div className="bg-gray-800/50 p-4 rounded-lg shadow-sm border border-gray-700/50 mb-6">
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div>
           <label className="block text-sm font-semibold mb-1">Desde</label>
@@ -64,7 +64,7 @@ export const FiltrosReportes = ({
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           />
         </div>
         <div>
@@ -73,7 +73,7 @@ export const FiltrosReportes = ({
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           />
         </div>
         <div>
@@ -81,7 +81,7 @@ export const FiltrosReportes = ({
           <select
             value={negocio}
             onChange={(e) => setNegocio(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           >
             {NEGOCIOS.map(n => (
               <option key={n.id} value={n.id}>{n.nombre}</option>
@@ -93,7 +93,7 @@ export const FiltrosReportes = ({
           <select
             value={tipoMovimiento}
             onChange={(e) => setTipoMovimiento(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           >
             {TIPOS_MOVIMIENTO.map(t => (
               <option key={t.id} value={t.id}>{t.nombre}</option>
@@ -107,7 +107,7 @@ export const FiltrosReportes = ({
             <select
               value={tipoRetiro}
               onChange={(e) => setTipoRetiro(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               <option value="todos">Todos</option>
               {TIPOS_RETIRO.map(t => (
@@ -123,7 +123,7 @@ export const FiltrosReportes = ({
             <select
               value={metodoPago}
               onChange={(e) => setMetodoPago(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               {METODOS_PAGO.map(m => (
                 <option key={m.id} value={m.id}>{m.nombre}</option>
@@ -138,7 +138,7 @@ export const FiltrosReportes = ({
             <select
               value={facturaFilter}
               onChange={(e) => setFacturaFilter(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               <option value="todos">Todas</option>
               <option value="facturadas">Facturadas</option>
@@ -160,15 +160,15 @@ export const FiltrosReportes = ({
                   onChange={(e) => setBusquedaProducto(e.target.value)}
                   onFocus={() => setMostrarSelectorProductos(true)}
                   placeholder={productosSeleccionados.length > 0 ? `${productosSeleccionados.length} productos seleccionados` : "Buscar por código o nombre..."}
-                  className="w-full border p-2 rounded"
+                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
                 />
                 {mostrarSelectorProductos && (
-                  <div className="absolute z-10 mt-1 bg-white border rounded shadow-lg max-h-64 overflow-y-auto w-full left-0">
-                    <div className="p-2 bg-gray-100 sticky top-0 flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Productos disponibles</span>
+                  <div className="absolute z-10 mt-1 bg-gray-800/50 border rounded shadow-sm border border-gray-700/50 max-h-64 overflow-y-auto w-full left-0">
+                    <div className="p-2 bg-gray-700 sticky top-0 flex justify-between items-center">
+                      <span className="text-xs text-gray-300">Productos disponibles</span>
                       <button
                         onClick={() => setMostrarSelectorProductos(false)}
-                        className="text-gray-500 hover:text-gray-700 text-lg"
+                        className="text-gray-400 hover:text-gray-200 text-lg"
                       >
                         ✕
                       </button>
@@ -179,21 +179,21 @@ export const FiltrosReportes = ({
                         value={busquedaProducto}
                         onChange={(e) => setBusquedaProducto(e.target.value)}
                         placeholder="Buscar producto..."
-                        className="w-full border p-1 rounded text-sm mb-2"
+                        className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-1 rounded text-sm mb-2"
                         autoFocus
                       />
                       {productosFiltrados.map(producto => (
                         <label
                           key={producto.id}
-                          className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer"
+                          className="flex items-center gap-2 p-1 hover:bg-gray-700 cursor-pointer"
                         >
                           <input
                             type="checkbox"
                             checked={productosSeleccionados.includes(producto.id)}
                             onChange={() => toggleProducto(producto.id)}
-                            className="rounded"
+                            className="rounded bg-gray-700 border-gray-600 text-gray-100"
                           />
-                          <span className="text-xs text-gray-500 w-16">{producto.codigoInterno}</span>
+                          <span className="text-xs text-gray-400 w-16">{producto.codigoInterno}</span>
                           <span className="text-sm truncate">{producto.nombre}</span>
                         </label>
                       ))}

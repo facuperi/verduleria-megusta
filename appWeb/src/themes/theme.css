@@ -1,0 +1,79 @@
+[data-theme="light"] {
+  --color-page: #f9fafb;
+  --color-sidebar: #ffffff;
+  --color-card: #ffffff;
+  --color-card-hover: #f3f4f6;
+  --color-input: #ffffff;
+  --color-table-header: #f3f4f6;
+
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #4b5563;
+  --text-muted: #6b7280;
+  --text-icon: #9ca3af;
+
+  --border-default: #e5e7eb;
+  --border-input: #d1d5db;
+}
+
+[data-theme="light"] { background-color: var(--color-page); color: var(--text-primary); }
+
+[data-theme="light"] [class*="bg-gray-950"] { background-color: var(--color-sidebar) !important; }
+[data-theme="light"] [class*="bg-gray-900"] { background-color: var(--color-page) !important; }
+[data-theme="light"] [class*="bg-gray-800"] { background-color: var(--color-card) !important; }
+[data-theme="light"] [class*="bg-gray-700"] { background-color: var(--color-table-header) !important; }
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea { background-color: var(--color-input) !important; border-color: var(--border-input) !important; color: var(--text-primary) !important; }
+
+[data-theme="light"] [class*="text-gray-100"] { color: var(--text-primary) !important; }
+[data-theme="light"] [class*="text-gray-200"] { color: var(--text-secondary) !important; }
+[data-theme="light"] [class*="text-gray-300"] { color: var(--text-tertiary) !important; }
+[data-theme="light"] [class*="text-gray-400"] { color: var(--text-muted) !important; }
+[data-theme="light"] [class*="text-gray-500"] { color: var(--text-icon) !important; }
+
+[data-theme="light"] [class*="border-gray-"] { border-color: var(--border-default) !important; }
+[data-theme="light"] .border-t { border-color: var(--border-default) !important; }
+
+[data-theme="light"] [class*="text-indigo-400"] { color: #4f46e5 !important; }
+[data-theme="light"] [class*="hover:text-indigo-300"]:hover { color: #4338ca !important; }
+[data-theme="light"] [class*="text-red-400"] { color: #dc2626 !important; }
+[data-theme="light"] [class*="hover:text-red-300"]:hover { color: #b91c1c !important; }
+[data-theme="light"] [class*="hover:text-red-400"]:hover { color: #dc2626 !important; }
+
+[data-theme="light"] [class*="bg-indigo-900"] { background-color: #eef2ff !important; }
+[data-theme="light"] [class*="text-indigo-300"] { color: #4338ca !important; }
+[data-theme="light"] [class*="bg-purple-900"] { background-color: #f3e8ff !important; }
+[data-theme="light"] [class*="text-purple-300"] { color: #7c3aed !important; }
+[data-theme="light"] [class*="bg-blue-900"] { background-color: #dbeafe !important; }
+[data-theme="light"] [class*="text-blue-300"] { color: #2563eb !important; }
+[data-theme="light"] [class*="bg-green-900"] { background-color: #f0fdf4 !important; }
+[data-theme="light"] [class*="bg-red-900"] { background-color: #fef2f2 !important; }
+[data-theme="light"] [class*="bg-yellow-900"] { background-color: #fefce8 !important; }
+
+[data-theme="light"] [class*="hover:bg-gray-800"]:hover { background-color: var(--color-card-hover) !important; }
+[data-theme="light"] [class*="hover:bg-gray-700"]:hover { background-color: var(--color-card-hover) !important; }
+
+[data-theme="light"] h1.text-white { color: var(--text-primary) !important; }
+[data-theme="light"] a.text-white { color: var(--text-primary) !important; }
+
+[data-theme="light"] [class*="bg-orange-900"] { background-color: #fff7ed !important; }
+[data-theme="light"] [class*="bg-amber-900"] { background-color: #fffbeb !important; }
+
+[data-theme="light"] [class*="text-green-400"] { color: #16a34a !important; }
+[data-theme="light"] [class*="text-blue-400"] { color: #2563eb !important; }
+[data-theme="light"] [class*="text-purple-400"] { color: #7c3aed !important; }
+[data-theme="light"] [class*="text-orange-400"] { color: #ea580c !important; }
+[data-theme="light"] [class*="text-amber-400"] { color: #d97706 !important; }
+[data-theme="light"] [class*="hover:text-blue-300"]:hover { color: #1d4ed8 !important; }
+
+[data-theme="light"] [class*="border-green-700"] { border-color: #bbf7d0 !important; }
+[data-theme="light"] [class*="border-red-700"] { border-color: #fecaca !important; }
+[data-theme="light"] [class*="border-orange-700"] { border-color: #fed7aa !important; }
+[data-theme="light"] [class*="border-amber-700"] { border-color: #fde68a !important; }
+[data-theme="light"] [class*="border-blue-700"] { border-color: #bfdbfe !important; }
+
+[data-theme="light"] [class*="bg-gray-600"] { background-color: #e5e7eb !important; }
+[data-theme="light"] [class*="hover:bg-gray-500"]:hover { background-color: #d1d5db !important; }
+[data-theme="light"] [class*="hover:bg-gray-600"]:hover { background-color: #d1d5db !important; }

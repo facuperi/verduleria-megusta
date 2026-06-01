@@ -194,9 +194,9 @@ export const MovimientosPage = () => {
       <h2 className="text-2xl font-bold mb-6">Movimientos de Stock</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-gray-800/50 p-6 rounded-lg shadow-sm border border-gray-700/50">
           <h3 className="text-lg font-semibold mb-4">Mover Stock entre Negocios</h3>
-          <p className="text-sm text-gray-500 mb-4">Transferir productos de un negocio a otro</p>
+          <p className="text-sm text-gray-400 mb-4">Transferir productos de un negocio a otro</p>
           <button
             onClick={() => { setShowMovimiento(true); setListaMovimiento([]); }}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -205,9 +205,9 @@ export const MovimientosPage = () => {
           </button>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-gray-800/50 p-6 rounded-lg shadow-sm border border-gray-700/50">
           <h3 className="text-lg font-semibold mb-4">Ingreso de Mercadería</h3>
-          <p className="text-sm text-gray-500 mb-4">Agregar stock a un negocio (compras, reposición)</p>
+          <p className="text-sm text-gray-400 mb-4">Agregar stock a un negocio (compras, reposición)</p>
           <button
             onClick={() => { setShowIngreso(true); setListaIngreso([]); }}
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
@@ -218,7 +218,7 @@ export const MovimientosPage = () => {
       </div>
 
       {/* Historial de movimientos */}
-      <div className="mt-8 bg-white rounded-lg shadow">
+      <div className="mt-8 bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50">
         <div className="p-4 border-b">
           <h3 className="text-lg font-semibold">Historial de Movimientos</h3>
         </div>
@@ -229,7 +229,7 @@ export const MovimientosPage = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-800">
                 <tr className="border-b">
                   <th className="text-left px-4 py-3">Fecha</th>
                   <th className="text-left px-4 py-3">Tipo</th>
@@ -240,20 +240,20 @@ export const MovimientosPage = () => {
               </thead>
               <tbody>
                 {movimientos.map(m => (
-                  <tr key={m.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                  <tr key={m.id} className="border-b hover:bg-gray-700">
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-400">
                       {new Date(m.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        m.tipo === 'movimiento' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                        m.tipo === 'movimiento' ? 'bg-blue-900/30 text-blue-300' : 'bg-green-900/20 text-green-300'
                       }`}>
                         {m.tipo === 'movimiento' ? '↔ Movimiento' : '⬆ Ingreso'}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-medium">{m.productoNombre}</td>
                     <td className="px-4 py-3 text-center font-semibold">{m.cantidad}</td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-gray-400">
                       {m.tipo === 'movimiento'
                         ? `${m.origen} → ${m.destino}`
                         : `Recibido en ${m.negocio}`}
@@ -273,7 +273,7 @@ export const MovimientosPage = () => {
             <select
               value={movimientoOrigen}
               onChange={(e) => setMovimientoOrigen(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               <option value="chiclana">Chiclana</option>
               <option value="belgrano">Belgrano</option>
@@ -284,7 +284,7 @@ export const MovimientosPage = () => {
             <select
               value={movimientoDestino}
               onChange={(e) => setMovimientoDestino(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
             >
               <option value="belgrano">Belgrano</option>
               <option value="chiclana">Chiclana</option>
@@ -299,7 +299,7 @@ export const MovimientosPage = () => {
             value={busquedaMovimiento}
             onChange={(e) => setBusquedaMovimiento(e.target.value)}
             placeholder="Código, código interno o nombre..."
-            className="w-full border p-2 rounded"
+            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
           />
           {busquedaMovimiento && (
             <div className="max-h-32 overflow-y-auto border mt-1 rounded">
@@ -307,7 +307,7 @@ export const MovimientosPage = () => {
                 <div
                   key={p.id}
                   onClick={() => agregarAMovimiento(p)}
-                  className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+                  className="p-2 hover:bg-gray-700 cursor-pointer border-b text-sm"
                 >
                   {p.nombre} ({p.codigoInterno})
                 </div>
@@ -328,7 +328,7 @@ export const MovimientosPage = () => {
                     min="1"
                     value={item.cantidad}
                     onChange={(e) => setListaMovimiento(listaMovimiento.map(p => p.id === item.id ? { ...p, cantidad: parseInt(e.target.value) || 1 } : p))}
-                    className="w-16 border p-1 rounded text-center"
+                    className="w-16 border border-gray-600 bg-gray-700 text-gray-100 p-1 rounded text-center"
                   />
                   <button onClick={() => quitarDeMovimiento(item.id)} className="text-red-500 ml-2">✕</button>
                 </div>
@@ -341,7 +341,7 @@ export const MovimientosPage = () => {
           <button onClick={moverStock} disabled={procesando} className="bg-blue-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
             {procesando ? 'Moviendo...' : 'Confirmar Movimiento'}
           </button>
-          <button onClick={() => { setShowMovimiento(false); setListaMovimiento([]); }} className="bg-gray-300 px-4 py-2 rounded">
+          <button onClick={() => { setShowMovimiento(false); setListaMovimiento([]); }} className="bg-gray-600 px-4 py-2 rounded">
             Cancelar
           </button>
         </div>
@@ -354,7 +354,7 @@ export const MovimientosPage = () => {
               <select
                 value={ingresoNegocio}
                 onChange={(e) => setIngresoNegocio(e.target.value)}
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               >
                 <option value="chiclana">Chiclana</option>
                 <option value="belgrano">Belgrano</option>
@@ -368,7 +368,7 @@ export const MovimientosPage = () => {
                 value={busquedaIngreso}
                 onChange={(e) => setBusquedaIngreso(e.target.value)}
                 placeholder="Código, código interno o nombre..."
-                className="w-full border p-2 rounded"
+                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
               />
               {busquedaIngreso && (
                 <div className="max-h-32 overflow-y-auto border mt-1 rounded">
@@ -376,7 +376,7 @@ export const MovimientosPage = () => {
                     <div
                       key={p.id}
                       onClick={() => agregarAIngreso(p)}
-                      className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+                      className="p-2 hover:bg-gray-700 cursor-pointer border-b text-sm"
                     >
                       {p.nombre} ({p.codigoInterno})
                     </div>
@@ -397,7 +397,7 @@ export const MovimientosPage = () => {
                         min="1"
                         value={item.cantidad}
                         onChange={(e) => setListaIngreso(listaIngreso.map(p => p.id === item.id ? { ...p, cantidad: parseInt(e.target.value) || 1 } : p))}
-                        className="w-16 border p-1 rounded text-center"
+                        className="w-16 border border-gray-600 bg-gray-700 text-gray-100 p-1 rounded text-center"
                       />
                       <button onClick={() => quitarDeIngreso(item.id)} className="text-red-500 ml-2">✕</button>
                     </div>
@@ -409,7 +409,7 @@ export const MovimientosPage = () => {
               <button onClick={agregarStock} disabled={procesando} className="bg-green-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
                 {procesando ? 'Agregando...' : 'Agregar Stock'}
               </button>
-              <button onClick={() => { setShowIngreso(false); setListaIngreso([]); }} className="bg-gray-300 px-4 py-2 rounded">
+              <button onClick={() => { setShowIngreso(false); setListaIngreso([]); }} className="bg-gray-600 px-4 py-2 rounded">
                 Cancelar
               </button>
             </div>

@@ -12,10 +12,10 @@ const TIPOS_RETIRO_FIJOS = [
 
 export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFila, tiposRetiroPersonalizados, onReimprimirTicket }) => {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-100">
+          <thead className="bg-gray-700">
             <tr>
               <th className="px-4 py-2 text-left">Fecha</th>
               <th className="px-4 py-2 text-left">Hora</th>
@@ -39,8 +39,10 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                 const esNotaCredito = m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
                 tipo = esNotaCredito ? 'Nota Crédito' : 'Venta';
                 detalle = m.productos?.map(p => `${p.nombre} x${p.cantidad}`).join(', ');
-                monto = m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0);
-                colorFila = esNotaCredito ? 'bg-red-50' : 'bg-green-50';
+                monto = (m.pagos?.some(p => p.descuentoTipo)
+                  ? m.pagos.reduce((s, p) => s + (p.monto || 0), 0)
+                  : (m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0)));
+                colorFila = esNotaCredito ? 'bg-red-900/20' : 'bg-green-900/20';
               } else if (m.origen === 'retiros') {
                 const tipoFijo = TIPOS_RETIRO_FIJOS.find(t => t.id === m.tipo);
                 const tipoPersonalizado = tiposRetiroPersonalizados[m.tipo];
@@ -58,12 +60,12 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                 tipo = `${iconoRetiro} ${nombreTipo}`;
                 detalle = m.observacion || '-';
                 monto = -m.monto;
-                colorFila = 'bg-orange-50';
+                colorFila = 'bg-orange-900/20';
               } else {
                 tipo = m.estado === 'abierta' ? 'Apertura' : 'Cierre';
                 detalle = `Saldo: $${m.saldoApertura || m.saldoCierre || 0}`;
                 monto = m.estado === 'cerrada' ? (m.saldoCierre || 0) : (m.saldoApertura || 0);
-                colorFila = 'bg-blue-50';
+                colorFila = 'bg-blue-900/20';
               }
 
               const fecha = m.fecha?.toDate ? m.fecha.toDate() : new Date(m.fecha || m.hora);
@@ -75,7 +77,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                   onClick={() => toggleFila(m.id)}
                 >
                   <td className="px-4 py-2">
-                    <button className="text-gray-500 hover:text-gray-700 mr-2">
+                    <button className="text-gray-400 hover:text-gray-200 mr-2">
                       {filasExpandidas[m.id] ? '▼' : '▶'}
                     </button>
                     {fecha.toLocaleDateString('es-AR')}
@@ -84,23 +86,23 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                   <td className="px-4 py-2">{tipo}</td>
                   <td className="px-4 py-2 capitalize">{m.negocio || m.sucursal || '-'}</td>
                   <td className="px-4 py-2 max-w-xs truncate" title={detalle}>{detalle}</td>
-                  <td className={`px-4 py-2 text-right font-semibold ${monto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                   <td className={`px-4 py-2 text-right font-semibold ${monto >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     ${Math.abs(monto).toLocaleString('es-AR')}
                   </td>
                   <td className="px-4 py-2">{m.tipoPago?.join(', ') || '-'}</td>
-                  <td className="px-4 py-2 text-sm text-gray-500">{m.usuarioNombre || '-'}</td>
+                  <td className="px-4 py-2 text-sm text-gray-400">{m.usuarioNombre || '-'}</td>
                   <td className="px-4 py-2 text-center">
                     {m.origen === 'caja' && m.estado === 'cerrada' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onReimprimirTicket(m); }}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        className="text-blue-400 hover:text-blue-300 text-sm"
                         title="Reimprimir ticket de cierre"
                       >🧾</button>
                     )}
                   </td>
                 </tr>
                 {filasExpandidas[m.id] && (
-                  <tr key={`${m.id}-detalle`} className="border-t bg-gray-50">
+                  <tr key={`${m.id}-detalle`} className="border-t bg-gray-800">
                     <td colSpan={9} className="px-4 py-3">
                       <div className="text-sm">
                         <p className="font-semibold mb-2">Detalle completo:</p>
@@ -144,7 +146,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                               return (
                                 <p key={idx} className="text-xs ml-2">
                                   {pg.metodo}: ${(pg.monto || 0).toLocaleString('es-AR')}
-                                  {descValor > 0 && <span className="text-green-600"> ({descEtiqueta} desc s/$${(m.diferencia || m.total || 0).toLocaleString('es-AR')})</span>}
+                                  {descValor > 0 && <span className="text-green-400"> ({descEtiqueta} desc s/$${(m.diferencia || m.total || 0).toLocaleString('es-AR')})</span>}
                                 </p>
                               );
                             })}
