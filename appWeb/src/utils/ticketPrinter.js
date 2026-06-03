@@ -84,10 +84,10 @@ ${fechaCierre}    ${sucursalNombre}
  CIERRE:   ${fechaCierre}
 ───────────────────────────────────
   RESUMEN:
-  Ventas Brutas:   $${formatMonto(caja.ventasBrutas)}
-  Notas Credito:   -$${formatMonto(caja.notaCreditoTotal)}
-  VENTA NETA:      $${formatMonto(caja.ventaNeta)}
-  Descuentos:      -$${formatMonto(caja.totalDescuentos || 0)}
+   Ventas Brutas:   $${formatMonto((caja.ventaNeta || 0) + (caja.totalDescuentos || 0) + (caja.notaCreditoTotal || 0))}
+   Notas Credito:   -$${formatMonto(caja.notaCreditoTotal)}
+   Descuentos:      -$${formatMonto(caja.totalDescuentos || 0)}
+   VENTA NETA:      $${formatMonto(caja.ventaNeta)}
 ───────────────────────────────────
   X METODO DE PAGO:
   Efectivo:       $${formatMonto(caja.ventasEfectivo)}
