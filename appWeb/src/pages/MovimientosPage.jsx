@@ -112,6 +112,7 @@ export const MovimientosPage = () => {
           tipo: 'movimiento',
           productoId: item.id,
           productoNombre: producto.nombre,
+          codigoInterno: producto.codigoInterno,
           cantidad: item.cantidad,
           origen: movimientoOrigen,
           destino: movimientoDestino,
@@ -172,6 +173,7 @@ export const MovimientosPage = () => {
           tipo: 'ingreso',
           productoId: item.id,
           productoNombre: producto.nombre,
+          codigoInterno: producto.codigoInterno,
           cantidad: item.cantidad,
           negocio: ingresoNegocio,
           realizadoPor: user?.uid || 'gerente',
@@ -244,6 +246,7 @@ export const MovimientosPage = () => {
           tipo: 'corregir',
           productoId: item.id,
           productoNombre: producto.nombre,
+          codigoInterno: producto.codigoInterno,
           cantidad: item.cantidad,
           signo: item.signo,
           negocio: corregirNegocio,
@@ -326,6 +329,7 @@ export const MovimientosPage = () => {
                   <th className="text-left px-4 py-3">Fecha</th>
                   <th className="text-left px-4 py-3">Tipo</th>
                   <th className="text-left px-4 py-3">Producto</th>
+                  <th className="text-left px-4 py-3">Código</th>
                   <th className="text-center px-4 py-3">Cantidad</th>
                   <th className="text-left px-4 py-3">Detalle</th>
                 </tr>
@@ -344,6 +348,7 @@ export const MovimientosPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-medium">{m.productoNombre}</td>
+                    <td className="px-4 py-3 text-muted text-sm">{m.codigoInterno || '-'}</td>
                     <td className="px-4 py-3 text-center font-semibold">{m.cantidad}</td>
                     <td className="px-4 py-3 text-muted">
                       {m.tipo === 'movimiento'
