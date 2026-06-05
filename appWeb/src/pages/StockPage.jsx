@@ -76,7 +76,8 @@ export const StockPage = () => {
       };
 
       if (editando) {
-        await updateDoc(doc(db, 'productos', editando.id), data);
+        const { stockPorNegocio, stockGlobal, ...editData } = data;
+        await updateDoc(doc(db, 'productos', editando.id), editData);
       } else {
         await addDoc(collection(db, 'productos'), data);
       }
@@ -167,7 +168,7 @@ export const StockPage = () => {
           {isGerente && (
             <button
               onClick={() => setMostrarGlobal(!mostrarGlobal)}
-              className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}
+              className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-elevated'}`}
             >
               {mostrarGlobal ? 'Ver por Negocio' : 'Ver Global'}
             </button>
@@ -197,13 +198,13 @@ export const StockPage = () => {
           placeholder="Buscar por nombre, código de barras o código interno..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+          className="w-full border border-line-input bg-input text-body p-2 rounded"
         />
       </div>
 
-      <div className="bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50 overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-line overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-700">
+          <thead className="bg-table-header">
             <tr>
               <th className="px-4 py-2 text-left">Código</th>
               <th className="px-4 py-2 text-left">Nombre</th>
@@ -223,28 +224,28 @@ export const StockPage = () => {
           </thead>
           <tbody>
             {productosFiltrados.map(producto => (
-              <tr key={producto.id} className="border-t border-gray-700/50">
+              <tr key={producto.id} className="border-t border-line">
                 <td className="px-4 py-2 text-sm">{producto.codigoInterno}</td>
                 <td className="px-4 py-2">{producto.nombre}</td>
                 <td className="px-4 py-2 text-right">
                   <span className="block">EF: ${producto.precioEfectivo}</span>
-                  <span className="text-gray-400 text-sm">TJ: ${producto.precioTarjeta}</span>
+                  <span className="text-muted text-sm">TJ: ${producto.precioTarjeta}</span>
                 </td>
                 {mostrarGlobal ? (
                   <td className="px-4 py-2 text-center">
-                    <span className={`font-semibold ${producto.stockGlobal > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`font-semibold ${producto.stockGlobal > 0 ? 'text-green' : 'text-red'}`}>
                       {producto.stockGlobal || 0}
                     </span>
                   </td>
                 ) : (
                   <>
                     <td className="px-4 py-2 text-center">
-                      <span className={`font-semibold ${producto.stockPorNegocio?.chiclana > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`font-semibold ${producto.stockPorNegocio?.chiclana > 0 ? 'text-green' : 'text-red'}`}>
                         {producto.stockPorNegocio?.chiclana || 0}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-center">
-                      <span className={`font-semibold ${producto.stockPorNegocio?.belgrano > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`font-semibold ${producto.stockPorNegocio?.belgrano > 0 ? 'text-green' : 'text-red'}`}>
                         {producto.stockPorNegocio?.belgrano || 0}
                       </span>
                     </td>
@@ -252,10 +253,10 @@ export const StockPage = () => {
                 )}
                 {puedeEditar && (
                   <td className="px-4 py-2 text-right">
-                    <button onClick={() => abrirEditar(producto)} className="text-blue-400 hover:text-blue-300 mr-2">
+                    <button onClick={() => abrirEditar(producto)} className="text-blue hover:text-blue mr-2">
                       Editar
                     </button>
-                    <button onClick={() => eliminarProducto(producto.id)} disabled={eliminando} className="text-red-400 hover:text-red-300 disabled:opacity-50">
+                    <button onClick={() => eliminarProducto(producto.id)} disabled={eliminando} className="text-red hover:text-red disabled:opacity-50">
                       {eliminando ? '...' : 'Eliminar'}
                     </button>
                   </td>
@@ -277,7 +278,7 @@ export const StockPage = () => {
               type="text"
               value={formData.codigoBarras}
               onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
               placeholder="Escanear o ingresar"
             />
           </div>
@@ -287,7 +288,7 @@ export const StockPage = () => {
               type="text"
               value={formData.codigoInterno}
               onChange={(e) => setFormData({ ...formData, codigoInterno: e.target.value })}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
               required
             />
           </div>
@@ -297,7 +298,7 @@ export const StockPage = () => {
               type="text"
               value={formData.nombre}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
               required
             />
           </div>
@@ -309,7 +310,7 @@ export const StockPage = () => {
                 step="0.01"
                 value={formData.precioEfectivo}
                 onChange={(e) => setFormData({ ...formData, precioEfectivo: e.target.value })}
-                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+                className="w-full border border-line-input bg-input text-body p-2 rounded"
                 required
               />
             </div>
@@ -320,39 +321,47 @@ export const StockPage = () => {
                 step="0.01"
                 value={formData.precioTarjeta}
                 onChange={(e) => setFormData({ ...formData, precioTarjeta: e.target.value })}
-                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+                className="w-full border border-line-input bg-input text-body p-2 rounded"
                 required
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div>
-              <label className="block text-sm font-bold mb-1">Stock Chiclana</label>
-              <input
-                type="number"
-                value={formData.stockChiclana}
-                onChange={(e) => setFormData({ ...formData, stockChiclana: e.target.value })}
-                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
-              />
+          {!editando ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <label className="block text-sm font-bold mb-1">Stock Chiclana</label>
+                  <input
+                    type="number"
+                    value={formData.stockChiclana}
+                    onChange={(e) => setFormData({ ...formData, stockChiclana: e.target.value })}
+                    className="w-full border border-line-input bg-input text-body p-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1">Stock Belgrano</label>
+                  <input
+                    type="number"
+                    value={formData.stockBelgrano}
+                    onChange={(e) => setFormData({ ...formData, stockBelgrano: e.target.value })}
+                    className="w-full border border-line-input bg-input text-body p-2 rounded"
+                  />
+                </div>
+              </div>
+              <div className="bg-elevated p-2 rounded mb-3 text-sm text-center">
+                Stock Global: {calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano)}
+              </div>
+            </>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded mb-3 text-sm text-amber-800">
+              El stock se gestiona desde <strong>Movimientos de Stock</strong>
             </div>
-            <div>
-              <label className="block text-sm font-bold mb-1">Stock Belgrano</label>
-              <input
-                type="number"
-                value={formData.stockBelgrano}
-                onChange={(e) => setFormData({ ...formData, stockBelgrano: e.target.value })}
-                className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
-              />
-            </div>
-          </div>
-          <div className="bg-gray-700 p-2 rounded mb-3 text-sm text-center">
-            Stock Global: {calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano)}
-          </div>
+          )}
           <div className="flex gap-2">
             <button type="submit" disabled={procesando} className="bg-indigo-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
               {procesando ? 'Guardando...' : 'Guardar'}
             </button>
-            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-600 px-4 py-2 rounded">
+            <button type="button" onClick={() => setShowModal(false)} className="bg-surface px-4 py-2 rounded">
               Cancelar
             </button>
           </div>
