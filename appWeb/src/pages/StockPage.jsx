@@ -24,6 +24,8 @@ export const StockPage = () => {
   const [editando, setEditando] = useState(null);
   const [procesando, setProcesando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [sortField, setSortField] = useState('nombre');
+  const [sortDir, setSortDir] = useState('asc');
   
   const [formData, setFormData] = useState({
     codigoBarras: '',
@@ -39,6 +41,15 @@ export const StockPage = () => {
 
   const calcularStockGlobal = (stockChiclana, stockBelgrano) => {
     return (parseInt(stockChiclana) || 0) + (parseInt(stockBelgrano) || 0);
+  };
+
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
   };
 
   useEffect(() => {
@@ -156,6 +167,12 @@ export const StockPage = () => {
     p.codigoInterno?.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  const productosOrdenados = [...productosFiltrados].sort((a, b) => {
+    const valA = (a[sortField] || '').toString().toLowerCase();
+    const valB = (b[sortField] || '').toString().toLowerCase();
+    return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+
   if (loading) {
     return <Layout><LoadingSkeleton type="page" /></Layout>;
   }
@@ -203,11 +220,15 @@ export const StockPage = () => {
       </div>
 
       <div className="bg-card rounded-lg shadow-sm border border-line overflow-hidden">
-        <table className="w-full">
+          <table className="w-full">
           <thead className="bg-table-header">
             <tr>
-              <th className="px-4 py-2 text-left">Código</th>
-              <th className="px-4 py-2 text-left">Nombre</th>
+              <th className="px-4 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort('codigoInterno')}>
+                Código {sortField === 'codigoInterno' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </th>
+              <th className="px-4 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort('nombre')}>
+                Nombre {sortField === 'nombre' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </th>
               <th className="px-4 py-2 text-right">Precios (EF/TJ)</th>
               {mostrarGlobal ? (
                 <th className="px-4 py-2 text-center">Stock Global</th>
@@ -223,7 +244,7 @@ export const StockPage = () => {
             </tr>
           </thead>
           <tbody>
-            {productosFiltrados.map(producto => (
+            {productosOrdenados.map(producto => (
               <tr key={producto.id} className="border-t border-line">
                 <td className="px-4 py-2 text-sm">{producto.codigoInterno}</td>
                 <td className="px-4 py-2">{producto.nombre}</td>
