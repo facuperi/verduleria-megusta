@@ -10,11 +10,17 @@ const TIPOS_RETIRO = [
   { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
 ];
 
+const TIPOS_INGRESO = [
+  { id: 'ventaDirecta', nombre: 'Venta Directa', icono: '💰' },
+  { id: 'deposito', nombre: 'Depósito', icono: '🏦' },
+  { id: 'otroIngreso', nombre: 'Otro Ingreso', icono: '📥' },
+];
+
 const TIPOS_MOVIMIENTO = [
   { id: 'todos', nombre: 'Todos' },
-  { id: 'ventas', nombre: 'Ventas' },
-  { id: 'notasCredito', nombre: 'Notas de Crédito' },
+  { id: 'ventasNC', nombre: 'Ventas / NC' },
   { id: 'retiros', nombre: 'Retiros' },
+  { id: 'ingresos', nombre: 'Ingresos' },
   { id: 'apertura', nombre: 'Apertura de Caja' },
   { id: 'cierre', nombre: 'Cierre de Caja' },
 ];
@@ -30,7 +36,8 @@ const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
   { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopago', nombre: 'MercadoPago' },
+  { id: 'mercadopagoarista', nombre: 'MP Arista' },
+  { id: 'mercadopagoyanet', nombre: 'MP Yanet' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
@@ -40,6 +47,7 @@ export const FiltrosReportes = ({
   negocio, setNegocio,
   tipoMovimiento, setTipoMovimiento,
   tipoRetiro, setTipoRetiro,
+  tipoIngreso, setTipoIngreso,
   metodoPago, setMetodoPago,
   facturaFilter, setFacturaFilter,
   productosSeleccionados, toggleProducto, limpiarProductos,
@@ -56,7 +64,7 @@ export const FiltrosReportes = ({
   );
 
   return (
-    <div className="bg-gray-800/50 p-4 rounded-lg shadow-sm border border-gray-700/50 mb-6">
+    <div className="bg-card p-4 rounded-lg shadow-sm border border-line mb-6">
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div>
           <label className="block text-sm font-semibold mb-1">Desde</label>
@@ -64,7 +72,7 @@ export const FiltrosReportes = ({
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+            className="w-full border border-line-input bg-input text-body p-2 rounded"
           />
         </div>
         <div>
@@ -73,7 +81,7 @@ export const FiltrosReportes = ({
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
-            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+            className="w-full border border-line-input bg-input text-body p-2 rounded"
           />
         </div>
         <div>
@@ -81,7 +89,7 @@ export const FiltrosReportes = ({
           <select
             value={negocio}
             onChange={(e) => setNegocio(e.target.value)}
-            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+            className="w-full border border-line-input bg-input text-body p-2 rounded"
           >
             {NEGOCIOS.map(n => (
               <option key={n.id} value={n.id}>{n.nombre}</option>
@@ -93,7 +101,7 @@ export const FiltrosReportes = ({
           <select
             value={tipoMovimiento}
             onChange={(e) => setTipoMovimiento(e.target.value)}
-            className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+            className="w-full border border-line-input bg-input text-body p-2 rounded"
           >
             {TIPOS_MOVIMIENTO.map(t => (
               <option key={t.id} value={t.id}>{t.nombre}</option>
@@ -107,7 +115,7 @@ export const FiltrosReportes = ({
             <select
               value={tipoRetiro}
               onChange={(e) => setTipoRetiro(e.target.value)}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
             >
               <option value="todos">Todos</option>
               {TIPOS_RETIRO.map(t => (
@@ -117,13 +125,29 @@ export const FiltrosReportes = ({
           </div>
         )}
 
-        {(tipoMovimiento === 'ventas' || tipoMovimiento === 'todos') && (
+        {tipoMovimiento === 'ingresos' && (
+          <div>
+            <label className="block text-sm font-semibold mb-1">Tipo Ingreso</label>
+            <select
+              value={tipoIngreso}
+              onChange={(e) => setTipoIngreso(e.target.value)}
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
+            >
+              <option value="todos">Todos</option>
+              {TIPOS_INGRESO.map(t => (
+                <option key={t.id} value={t.id}>{t.nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {(tipoMovimiento === 'ventasNC' || tipoMovimiento === 'todos') && (
           <div>
             <label className="block text-sm font-semibold mb-1">Método Pago</label>
             <select
               value={metodoPago}
               onChange={(e) => setMetodoPago(e.target.value)}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
             >
               {METODOS_PAGO.map(m => (
                 <option key={m.id} value={m.id}>{m.nombre}</option>
@@ -132,22 +156,22 @@ export const FiltrosReportes = ({
           </div>
         )}
 
-        {(tipoMovimiento === 'ventas' || tipoMovimiento === 'todos') && (
+        {(tipoMovimiento === 'ventasNC' || tipoMovimiento === 'todos') && (
           <div>
             <label className="block text-sm font-semibold mb-1">Facturación</label>
             <select
               value={facturaFilter}
               onChange={(e) => setFacturaFilter(e.target.value)}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
             >
               <option value="todos">Todas</option>
               <option value="facturadas">Facturadas</option>
-              <option value="sinFacturar">Sin Facturar</option>
+              <option value="sinFacturar">Efectivo y Yanet</option>
             </select>
           </div>
         )}
 
-        {tipoMovimiento === 'ventas' && (
+        {tipoMovimiento === 'ventasNC' && (
           <div className="md:col-span-2 relative">
             <label className="block text-sm font-semibold mb-1">
               Productos {productosSeleccionados.length > 0 && `(${productosSeleccionados.length} seleccionados)`}
@@ -160,15 +184,15 @@ export const FiltrosReportes = ({
                   onChange={(e) => setBusquedaProducto(e.target.value)}
                   onFocus={() => setMostrarSelectorProductos(true)}
                   placeholder={productosSeleccionados.length > 0 ? `${productosSeleccionados.length} productos seleccionados` : "Buscar por código o nombre..."}
-                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+                  className="w-full border border-line-input bg-input text-body p-2 rounded"
                 />
                 {mostrarSelectorProductos && (
-                  <div className="absolute z-10 mt-1 bg-gray-800/50 border rounded shadow-sm border border-gray-700/50 max-h-64 overflow-y-auto w-full left-0">
-                    <div className="p-2 bg-gray-700 sticky top-0 flex justify-between items-center">
-                      <span className="text-xs text-gray-300">Productos disponibles</span>
+                  <div className="absolute z-10 mt-1 bg-card border rounded shadow-sm border border-line max-h-64 overflow-y-auto w-full left-0">
+                    <div className="p-2 bg-elevated sticky top-0 flex justify-between items-center">
+                      <span className="text-xs text-secondary">Productos disponibles</span>
                       <button
                         onClick={() => setMostrarSelectorProductos(false)}
-                        className="text-gray-400 hover:text-gray-200 text-lg"
+                        className="text-muted hover:text-body text-lg"
                       >
                         ✕
                       </button>
@@ -179,21 +203,21 @@ export const FiltrosReportes = ({
                         value={busquedaProducto}
                         onChange={(e) => setBusquedaProducto(e.target.value)}
                         placeholder="Buscar producto..."
-                        className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-1 rounded text-sm mb-2"
+                        className="w-full border border-line-input bg-input text-body p-1 rounded text-sm mb-2"
                         autoFocus
                       />
                       {productosFiltrados.map(producto => (
                         <label
                           key={producto.id}
-                          className="flex items-center gap-2 p-1 hover:bg-gray-700 cursor-pointer"
+                          className="flex items-center gap-2 p-1 hover:bg-elevated cursor-pointer"
                         >
                           <input
                             type="checkbox"
                             checked={productosSeleccionados.includes(producto.id)}
                             onChange={() => toggleProducto(producto.id)}
-                            className="rounded bg-gray-700 border-gray-600 text-gray-100"
+                            className="rounded"
                           />
-                          <span className="text-xs text-gray-400 w-16">{producto.codigoInterno}</span>
+                          <span className="text-xs text-muted w-16">{producto.codigoInterno}</span>
                           <span className="text-sm truncate">{producto.nombre}</span>
                         </label>
                       ))}
@@ -204,7 +228,7 @@ export const FiltrosReportes = ({
               {productosSeleccionados.length > 0 && (
                 <button
                   onClick={limpiarProductos}
-                  className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
+                  className="px-3 py-2 bg-red-soft text-red rounded hover:bg-red-soft text-sm"
                 >
                   Limpiar
                 </button>
@@ -218,12 +242,12 @@ export const FiltrosReportes = ({
                   return prod ? (
                     <span
                       key={id}
-                      className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs"
+                      className="inline-flex items-center gap-1 bg-indigo-soft text-indigo px-2 py-0.5 rounded text-xs"
                     >
                       {prod.codigoInterno}
                       <button
                         onClick={() => toggleProducto(id)}
-                        className="text-indigo-500 hover:text-indigo-700"
+                        className="text-indigo hover:text-indigo"
                       >
                         ✕
                       </button>

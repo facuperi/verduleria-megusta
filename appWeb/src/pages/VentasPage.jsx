@@ -40,7 +40,7 @@ const calcularDescuento = (pago, totalBase = 0) => {
 };
 
 const necesitaFacturaAuto = (tiposPago) => {
-  const metodosAuto = ['tarjeta', 'debito', 'cuentadni'];
+  const metodosAuto = ['tarjeta', 'debito', 'cuentadni', 'mercadopagoarista'];
   return metodosAuto.some(m => tiposPago.includes(m));
 };
 
