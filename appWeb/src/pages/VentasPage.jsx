@@ -20,7 +20,8 @@ const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
   { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopago', nombre: 'MercadoPago' },
+  { id: 'mercadopagoarista', nombre: 'MP Arista' },
+  { id: 'mercadopagoyanet', nombre: 'MP Yanet' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
@@ -83,6 +84,14 @@ export const VentasPage = () => {
   const [facturaData, setFacturaData] = useState(null);
   const [facturando, setFacturando] = useState(false);
   const [agregarComoNotaCredito, setAgregarComoNotaCredito] = useState(false);
+  
+  // Tipos de descuento
+  const [tiposDescuento, setTiposDescuento] = useState([]);
+  const [tipoDescuento, setTipoDescuento] = useState('');
+  const [mostrarModalNuevoTipoDesc, setMostrarModalNuevoTipoDesc] = useState(false);
+  const [nombreNuevoTipoDesc, setNombreNuevoTipoDesc] = useState('');
+  const [iconoNuevoTipoDesc, setIconoNuevoTipoDesc] = useState('🏷️');
+  const [creandoTipoDescuento, setCreandoTipoDescuento] = useState(false);
   
   // Modal facturación
   const [mostrarModalFactura, setMostrarModalFactura] = useState(false);
@@ -169,6 +178,20 @@ export const VentasPage = () => {
         } else {
           setCaja(null);
         }
+
+        // Cargar tipos de descuento
+        const tiposDescSnapshot = await getDocs(collection(db, 'tiposDescuento'));
+        const tiposDescData = tiposDescSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (tiposDescData.length === 0) {
+          const seed = [
+            { nombre: 'empleados', icono: '👥' },
+            { nombre: 'efectivo', icono: '💵' },
+          ];
+          const ids = await Promise.all(seed.map(s => addDoc(collection(db, 'tiposDescuento'), s)));
+          setTiposDescuento(seed.map((s, i) => ({ id: ids[i].id, ...s })));
+        } else {
+          setTiposDescuento(tiposDescData);
+        }
       } catch (err) {
         setError('Error al cargar datos');
       } finally {
@@ -195,6 +218,10 @@ export const VentasPage = () => {
   };
 
   const agregarAlCarrito = (producto, tipoPrecio = 'efectivo') => {
+    if (!agregarComoNotaCredito && caja && (producto.stockPorNegocio?.[caja.sucursal] || 0) <= 0) {
+      showToast(`❌ ${producto.nombre} no tiene existencias en ${caja.sucursal === 'chiclana' ? 'Chiclana' : 'Belgrano'}`, 'warning');
+      return;
+    }
     const existe = carrito.find(p => p.id === producto.id && p.precioSeleccionado === tipoPrecio);
     if (existe) {
       setCarrito(carrito.map(p => 
@@ -431,7 +458,7 @@ export const VentasPage = () => {
             monto: parseFloat(p.monto) || 0,
             descuentoTipo: desc > 0 ? p.descuentoTipo : null,
             descuentoValor: desc > 0 ? (parseFloat(p.descuentoValor) || 0) : 0,
-            montoReal: parseFloat(p.monto) || 0,
+            montoReal: Math.max(0, (parseFloat(p.monto) || 0) - desc),
           };
         }),
         facturada: false,
@@ -439,6 +466,7 @@ export const VentasPage = () => {
         usuarioNombre: user.email || 'Usuario',
         fecha: serverTimestamp(),
         hora: ahora.toISOString(),
+        tipoDescuento: totalDescuentos > 0 && tipoDescuento ? tipoDescuento : null,
       });
 
       // Actualizar stock del negocio
@@ -471,7 +499,8 @@ export const VentasPage = () => {
             'efectivo': 'ventasEfectivo',
             'tarjeta': 'ventasTarjeta',
             'debito': 'ventasDebito',
-            'mercadopago': 'ventasMercadoPago',
+            'mercadopagoarista': 'ventasMPArista',
+            'mercadopagoyanet': 'ventasMPYanet',
             'cuentadni': 'ventasCuentaDNI',
           }[pago.metodo];
           
@@ -499,6 +528,7 @@ export const VentasPage = () => {
       setObservacion('');
       setFacturaData(null);
       setAgregarComoNotaCredito(false);
+      setTipoDescuento('');
       
       const pagosConDescuento = pagosSeleccionados.map(p => {
         const desc = calcularDescuento(p, diferencia);
@@ -569,6 +599,30 @@ export const VentasPage = () => {
     }
   };
 
+  const crearTipoDescuento = async () => {
+    if (!nombreNuevoTipoDesc.trim()) {
+      showToast('Ingresá un nombre para el tipo de descuento', 'warning');
+      return;
+    }
+    setCreandoTipoDescuento(true);
+    try {
+      const docRef = await addDoc(collection(db, 'tiposDescuento'), {
+        nombre: nombreNuevoTipoDesc.trim(),
+        icono: iconoNuevoTipoDesc,
+      });
+      setTiposDescuento([...tiposDescuento, { id: docRef.id, nombre: nombreNuevoTipoDesc.trim(), icono: iconoNuevoTipoDesc }]);
+      setMostrarModalNuevoTipoDesc(false);
+      setNombreNuevoTipoDesc('');
+      setIconoNuevoTipoDesc('🏷️');
+      showToast('Tipo de descuento creado con éxito', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al crear tipo de descuento', 'error');
+    } finally {
+      setCreandoTipoDescuento(false);
+    }
+  };
+
   // Función para manejar el scanner de código de barras
   const handleScannerInput = (e) => {
     const valor = e.target.value;
@@ -594,7 +648,7 @@ export const VentasPage = () => {
   if (!canSell) {
     return (
       <Layout>
-        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
+        <div className="bg-yellow-soft border border-yellow-line text-yellow px-4 py-3 rounded">
           {restriction.message}
         </div>
       </Layout>
@@ -604,7 +658,7 @@ export const VentasPage = () => {
   return (
     <Layout>
       {!caja && (
-        <div className="bg-red-900/20 border border-red-600 text-red-300 px-4 py-3 rounded mb-4">
+        <div className="bg-red-soft border border-red text-red px-4 py-3 rounded mb-4">
           ⚠️ No hay caja abierta. <a href="/caja" className="underline font-semibold">Abrir caja</a> para poder vender.
         </div>
       )}
@@ -641,6 +695,10 @@ export const VentasPage = () => {
             totalConDescuento={totalConDescuento}
             error={error}
             tipoPrecioGlobal={tipoPrecioGlobal}
+            tiposDescuento={tiposDescuento}
+            tipoDescuento={tipoDescuento}
+            onChangeTipoDescuento={setTipoDescuento}
+            onAbrirModalTipoDesc={() => setMostrarModalNuevoTipoDesc(true)}
             onCambiarCantidad={actualizarCantidad}
             onQuitarDelCarrito={quitarDelCarrito}
             onTogglePrecioGlobal={handleTogglePrecioGlobal}
@@ -656,7 +714,7 @@ export const VentasPage = () => {
           />
 
           {ventaExitosa && (
-            <div className="bg-green-900/20 border border-green-600 text-green-300 p-4 rounded-lg shadow-sm mb-4">
+            <div className="bg-green-soft border border-green text-green p-4 rounded-lg shadow-sm mb-4">
               <div className="flex justify-between items-center">
                 <div>
                   <p className="font-bold">✅ Venta exitosa</p>
@@ -673,20 +731,20 @@ export const VentasPage = () => {
                 <div className="mt-2 flex gap-2">
                   <button
                     onClick={handleFacturaA}
-                    className="flex-1 bg-blue-900/30 text-blue-300 py-1 px-2 rounded text-xs hover:bg-blue-800"
+                    className="flex-1 bg-blue-soft text-blue py-1 px-2 rounded text-xs hover:bg-blue-soft"
                   >
                     📄 Factura A
                   </button>
                   <button
                     onClick={handleFacturarManual}
-                    className="flex-1 bg-gray-700 text-gray-200 py-1 px-2 rounded text-xs hover:bg-gray-600"
+                    className="flex-1 bg-elevated text-body py-1 px-2 rounded text-xs hover:bg-surface"
                   >
                     📄 Cons. Final
                   </button>
                 </div>
               )}
               {facturando && (
-                <p className="mt-2 text-sm text-blue-400">⏳ Generando factura...</p>
+                <p className="mt-2 text-sm text-blue">⏳ Generando factura...</p>
               )}
             </div>
           )}
@@ -703,14 +761,14 @@ export const VentasPage = () => {
               onChange={(e) => setCuitCliente(e.target.value.replace(/\D/g, ''))}
               placeholder="Ej: 20123456789"
               maxLength={11}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
             />
-            <p className="text-xs text-gray-400 mt-1">Ingresá los 11 dígitos del CUIT</p>
+            <p className="text-xs text-muted mt-1">Ingresá los 11 dígitos del CUIT</p>
           </div>
         )}
         
         {tipoFacturaSeleccionado === 'B' && (
-          <p className="mb-4 text-gray-300">Se generará una Factura B para consumidor final.</p>
+          <p className="mb-4 text-secondary">Se generará una Factura B para consumidor final.</p>
         )}
         
         <div className="flex gap-2">
@@ -723,7 +781,56 @@ export const VentasPage = () => {
           </button>
           <button
             onClick={() => setMostrarModalFactura(false)}
-            className="px-4 py-2 border border-gray-600 rounded hover:bg-gray-700"
+            className="px-4 py-2 border border-line-input rounded hover:bg-elevated"
+          >
+            Cancelar
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={mostrarModalNuevoTipoDesc} onClose={() => { setMostrarModalNuevoTipoDesc(false); setNombreNuevoTipoDesc(''); setIconoNuevoTipoDesc('🏷️'); }} title="Nuevo Tipo de Descuento">
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Nombre</label>
+          <input
+            type="text"
+            value={nombreNuevoTipoDesc}
+            onChange={(e) => setNombreNuevoTipoDesc(e.target.value)}
+            className="w-full border border-line-input bg-input text-body p-2 rounded"
+            placeholder="Ej: Empleados"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1">Icono</label>
+          <select
+            value={iconoNuevoTipoDesc}
+            onChange={(e) => setIconoNuevoTipoDesc(e.target.value)}
+            className="w-full border border-line-input bg-input text-body p-2 rounded"
+          >
+            <option value="🏷️">🏷️ Descuento</option>
+            <option value="👥">👥 Empleados</option>
+            <option value="💵">💵 Efectivo</option>
+            <option value="🎉">🎉 Promoción</option>
+            <option value="⭐">⭐ Fidelidad</option>
+            <option value="📦">📦 Volumen</option>
+            <option value="🎂">🎂 Cumpleaños</option>
+            <option value="🤝">🤝 Convenio</option>
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={crearTipoDescuento}
+            disabled={creandoTipoDescuento || !nombreNuevoTipoDesc.trim()}
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {creandoTipoDescuento ? 'Creando...' : 'Crear Tipo'}
+          </button>
+          <button
+            onClick={() => {
+              setMostrarModalNuevoTipoDesc(false);
+              setNombreNuevoTipoDesc('');
+              setIconoNuevoTipoDesc('🏷️');
+            }}
+            className="px-4 py-2 border border-line-input rounded hover:bg-elevated"
           >
             Cancelar
           </button>
