@@ -1,7 +1,5 @@
 {
   "projects": {
-    "default": "sistema-santos"
-  },
-  "targets": {},
-  "etags": {}
+    "default": "sistema-megusta"
+  }
 }
