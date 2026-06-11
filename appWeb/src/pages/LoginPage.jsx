@@ -24,7 +24,7 @@ export const LoginPage = () => {
     setLoading(true);
 
     try {
-      const emailConvertido = `${username.toLowerCase().trim()}@santos.com`;
+      const emailConvertido = `${username.toLowerCase().trim()}@megusta.com`;
       const userCredential = await signInWithEmailAndPassword(auth, emailConvertido, password);
       const uid = userCredential.user.uid;
       
