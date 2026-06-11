@@ -10,12 +10,18 @@ const TIPOS_RETIRO_FIJOS = [
   { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
 ];
 
-export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFila, tiposRetiroPersonalizados, onReimprimirTicket }) => {
+const TIPOS_INGRESO_FIJOS = [
+  { id: 'ventaDirecta', nombre: 'Venta Directa', icono: '💰' },
+  { id: 'deposito', nombre: 'Depósito', icono: '🏦' },
+  { id: 'otroIngreso', nombre: 'Otro Ingreso', icono: '📥' },
+];
+
+export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFila, tiposRetiroPersonalizados, tiposIngresoPersonalizados, onReimprimirTicket }) => {
   return (
-    <div className="bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50 overflow-hidden">
+    <div className="bg-card rounded-lg shadow-sm border border-line overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-700">
+          <thead className="bg-table-header">
             <tr>
               <th className="px-4 py-2 text-left">Fecha</th>
               <th className="px-4 py-2 text-left">Hora</th>
@@ -42,7 +48,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                 monto = (m.pagos?.some(p => p.descuentoTipo)
                   ? m.pagos.reduce((s, p) => s + (p.monto || 0), 0)
                   : (m.total ?? (m.diferencia > 0 ? m.diferencia : m.totalNotaCredito || 0)));
-                colorFila = esNotaCredito ? 'bg-red-900/20' : 'bg-green-900/20';
+                colorFila = esNotaCredito ? 'bg-red-soft' : 'bg-green-soft';
               } else if (m.origen === 'retiros') {
                 const tipoFijo = TIPOS_RETIRO_FIJOS.find(t => t.id === m.tipo);
                 const tipoPersonalizado = tiposRetiroPersonalizados[m.tipo];
@@ -60,12 +66,30 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                 tipo = `${iconoRetiro} ${nombreTipo}`;
                 detalle = m.observacion || '-';
                 monto = -m.monto;
-                colorFila = 'bg-orange-900/20';
+                colorFila = 'bg-orange-soft';
+              } else if (m.origen === 'ingresos') {
+                const tipoFijo = TIPOS_INGRESO_FIJOS.find(t => t.id === m.tipo);
+                const tipoPersonalizado = tiposIngresoPersonalizados[m.tipo];
+                let nombreTipo = '';
+                let iconoIngreso = '🟢';
+                if (tipoFijo) {
+                  nombreTipo = tipoFijo.nombre;
+                  iconoIngreso = tipoFijo.icono;
+                } else if (tipoPersonalizado) {
+                  nombreTipo = tipoPersonalizado.nombre;
+                  iconoIngreso = tipoPersonalizado.icono || '🟢';
+                } else {
+                  nombreTipo = m.tipo.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                }
+                tipo = `${iconoIngreso} ${nombreTipo}`;
+                detalle = m.observacion || '-';
+                monto = m.monto;
+                colorFila = 'bg-green-soft';
               } else {
                 tipo = m.estado === 'abierta' ? 'Apertura' : 'Cierre';
                 detalle = `Saldo: $${m.saldoApertura || m.saldoCierre || 0}`;
                 monto = m.estado === 'cerrada' ? (m.saldoCierre || 0) : (m.saldoApertura || 0);
-                colorFila = 'bg-blue-900/20';
+                colorFila = 'bg-blue-soft';
               }
 
               const fecha = m.fecha?.toDate ? m.fecha.toDate() : new Date(m.fecha || m.hora);
@@ -73,11 +97,11 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
               return (
                 <React.Fragment key={m.id}>
                 <tr
-                  className={`border-t ${colorFila} cursor-pointer hover:opacity-90`}
+                  className={`border-t border-line ${colorFila} cursor-pointer hover:opacity-80`}
                   onClick={() => toggleFila(m.id)}
                 >
                   <td className="px-4 py-2">
-                    <button className="text-gray-400 hover:text-gray-200 mr-2">
+                    <button className="text-secondary hover:text-body mr-2">
                       {filasExpandidas[m.id] ? '▼' : '▶'}
                     </button>
                     {fecha.toLocaleDateString('es-AR')}
@@ -86,23 +110,23 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                   <td className="px-4 py-2">{tipo}</td>
                   <td className="px-4 py-2 capitalize">{m.negocio || m.sucursal || '-'}</td>
                   <td className="px-4 py-2 max-w-xs truncate" title={detalle}>{detalle}</td>
-                   <td className={`px-4 py-2 text-right font-semibold ${monto >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                   <td className={`px-4 py-2 text-right font-semibold ${monto >= 0 ? 'text-green' : 'text-red'}`}>
                     ${Math.abs(monto).toLocaleString('es-AR')}
                   </td>
                   <td className="px-4 py-2">{m.tipoPago?.join(', ') || '-'}</td>
-                  <td className="px-4 py-2 text-sm text-gray-400">{m.usuarioNombre || '-'}</td>
+                  <td className="px-4 py-2 text-sm text-muted">{m.usuarioNombre || '-'}</td>
                   <td className="px-4 py-2 text-center">
                     {m.origen === 'caja' && m.estado === 'cerrada' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onReimprimirTicket(m); }}
-                        className="text-blue-400 hover:text-blue-300 text-sm"
+                        className="text-blue hover:text-blue text-sm"
                         title="Reimprimir ticket de cierre"
                       >🧾</button>
                     )}
                   </td>
                 </tr>
                 {filasExpandidas[m.id] && (
-                  <tr key={`${m.id}-detalle`} className="border-t bg-gray-800">
+                  <tr key={`${m.id}-detalle`} className="border-t border-line bg-card">
                     <td colSpan={9} className="px-4 py-3">
                       <div className="text-sm">
                         <p className="font-semibold mb-2">Detalle completo:</p>
@@ -118,7 +142,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                             </thead>
                             <tbody>
                               {m.productos.map((p, idx) => (
-                                <tr key={idx} className="border-b">
+                                 <tr key={idx} className="border-b border-line">
                                   <td className="py-1">{p.nombre}</td>
                                   <td className="py-1">{p.cantidad}</td>
                                   <td className="py-1">${p.precio}</td>
@@ -128,9 +152,25 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                             </tbody>
                           </table>
                         )}
+                        {m.origen === 'ventas' && (
+                          <div className="mt-2">
+                            {m.notaCreditoDescuento > 0 && (
+                              <p className="text-xs ml-2 mb-1"><strong>NC redimida:</strong> -${m.notaCreditoDescuento.toLocaleString('es-AR')}</p>
+                            )}
+                            {m.notaCreditoOriginal > 0 && (
+                              <p className="text-xs ml-2 mb-1"><strong>Comp. original:</strong> ${m.notaCreditoOriginal.toLocaleString('es-AR')}</p>
+                            )}
+                            {m.nuevoSaldoFavor > 0 && (
+                              <p className="text-xs ml-2 mb-1"><strong>NC generada:</strong> ${m.nuevoSaldoFavor.toLocaleString('es-AR')}</p>
+                            )}
+                          </div>
+                        )}
                         {m.origen === 'ventas' && m.pagos && (
                           <div className="mt-2">
                             <p className="font-semibold mb-1">Métodos de pago:</p>
+                            {m.tipoDescuento && (
+                              <p className="text-xs ml-2 mb-1"><strong>Tipo de descuento:</strong> {m.tipoDescuento}</p>
+                            )}
                             {m.pagos.map((pg, idx) => {
                               const tieneDesc = pg.descuentoTipo && pg.descuentoValor > 0;
                               const descEtiqueta = tieneDesc
@@ -146,13 +186,16 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                               return (
                                 <p key={idx} className="text-xs ml-2">
                                   {pg.metodo}: ${(pg.monto || 0).toLocaleString('es-AR')}
-                                  {descValor > 0 && <span className="text-green-400"> ({descEtiqueta} desc s/$${(m.diferencia || m.total || 0).toLocaleString('es-AR')})</span>}
+                                  {descValor > 0 && <span className="text-green"> ({descEtiqueta} desc s/$${(m.diferencia || m.total || 0).toLocaleString('es-AR')})</span>}
                                 </p>
                               );
                             })}
                           </div>
                         )}
                         {m.origen === 'retiros' && (
+                          <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${m.monto} | <strong>Obs:</strong> {m.observacion || '-'}</p>
+                        )}
+                        {m.origen === 'ingresos' && (
                           <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${m.monto} | <strong>Obs:</strong> {m.observacion || '-'}</p>
                         )}
                         {m.origen === 'caja' && (
@@ -162,7 +205,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                             <strong> Estado:</strong> {m.estado}
                           </p>
                         )}
-                        {m.observacion && m.origen !== 'retiros' && (
+                        {m.observacion && m.origen !== 'retiros' && m.origen !== 'ingresos' && (
                           <p className="mt-2"><strong>Observación:</strong> {m.observacion}</p>
                         )}
                       </div>

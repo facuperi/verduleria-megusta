@@ -78,7 +78,7 @@ export const UsuariosPage = () => {
       setFormData({ id: '', password: '', nombre: '', rol: 'empleado', activo: true });
       
       const snapshot = await getDocs(collection(db, 'users'));
-      setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setUsuarios(snapshot.docs.map(doc => ({ _uid: doc.id, ...doc.data() })));
     } catch (err) {
       const code = err.code?.split('/').pop() || err.message;
       if (code === 'already-exists') {
@@ -134,11 +134,17 @@ export const UsuariosPage = () => {
     const ok = await confirm('¿Estás seguro de eliminar este usuario?', 'Eliminar usuario');
     if (!ok) return;
     try {
-      await deleteDoc(doc(db, 'users', id));
-      setUsuarios(usuarios.filter(u => u.id !== id));
+      const fn = httpsCallable(functions, 'eliminarUsuario');
+      await fn({ uid: id });
+      setUsuarios(usuarios.filter(u => u._uid !== id));
       showToast('Usuario eliminado', 'success');
     } catch (err) {
-      showToast('Error al eliminar usuario: ' + err.message, 'error');
+      const code = err.code?.split('/').pop();
+      if (code === 'permission-denied') {
+        showToast('No tenés permisos de gerente para eliminar usuarios', 'error');
+      } else {
+        showToast('Error al eliminar usuario: ' + err.message, 'error');
+      }
     }
   };
 
@@ -155,7 +161,7 @@ export const UsuariosPage = () => {
   if (!canAccess) {
     return (
       <Layout>
-        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
+        <div className="bg-yellow-soft border border-yellow-line text-yellow px-4 py-3 rounded">
           {restriction.message}
         </div>
       </Layout>
@@ -174,9 +180,9 @@ export const UsuariosPage = () => {
         </button>
       </div>
 
-      <div className="bg-gray-800/50 rounded-lg shadow-sm border border-gray-700/50 overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-line overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-700">
+          <thead className="bg-table-header">
             <tr>
               <th className="px-4 py-2 text-left">Nombre</th>
               <th className="px-4 py-2 text-left">ID de usuario</th>
@@ -187,29 +193,29 @@ export const UsuariosPage = () => {
           </thead>
           <tbody>
             {usuarios.map(usuario => (
-              <tr key={usuario._uid} className="border-t border-gray-700/50">
+              <tr key={usuario._uid} className="border-t border-line">
                 <td className="px-4 py-2">{usuario.nombre}</td>
                 <td className="px-4 py-2">{usuario.id || usuario.email}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded text-sm ${usuario.rol === 'gerente' ? 'bg-purple-900/30 text-purple-300' : 'bg-blue-900/30 text-blue-300'}`}>
+                  <span className={`px-2 py-1 rounded text-sm ${usuario.rol === 'gerente' ? 'bg-purple-soft text-purple' : 'bg-blue-soft text-blue'}`}>
                     {usuario.rol}
                   </span>
                 </td>
                 <td className="px-4 py-2">
-                  <span className="text-gray-400 tracking-widest">••••••••</span>
+                  <span className="text-muted tracking-widest">••••••••</span>
                   <button
                     onClick={() => abrirCambiarPassword(usuario)}
-                    className="ml-2 text-gray-400 hover:text-indigo-400"
+                    className="ml-2 text-muted hover:text-indigo"
                     title="Cambiar contraseña"
                   >
                     ✏️
                   </button>
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => abrirEditar(usuario)} className="text-blue-400 hover:text-blue-300 mr-2">
+                  <button onClick={() => abrirEditar(usuario)} className="text-blue hover:text-blue mr-2">
                     Editar
                   </button>
-                   <button onClick={() => eliminarUsuario(usuario._uid)} className="text-red-400 hover:text-red-300">
+                   <button onClick={() => eliminarUsuario(usuario._uid)} className="text-red hover:text-red">
                     Eliminar
                   </button>
                 </td>
@@ -230,7 +236,7 @@ export const UsuariosPage = () => {
               type="text"
               value={formData.nombre}
               onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
               required
             />
           </div>
@@ -242,7 +248,7 @@ export const UsuariosPage = () => {
                   type="text"
                   value={formData.id}
                   onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+                  className="w-full border border-line-input bg-input text-body p-2 rounded"
                   placeholder="ej: juan, maria123"
                   required
                 />
@@ -253,7 +259,7 @@ export const UsuariosPage = () => {
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+                  className="w-full border border-line-input bg-input text-body p-2 rounded"
                   required
                 />
               </div>
@@ -264,7 +270,7 @@ export const UsuariosPage = () => {
             <select
               value={formData.rol}
               onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
             >
               <option value="empleado">Empleado</option>
               <option value="gerente">Gerente</option>
@@ -274,7 +280,7 @@ export const UsuariosPage = () => {
             <button type="submit" disabled={submitting} className={`${submitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-4 py-2 rounded flex-1`}>
               {submitting ? 'Guardando...' : 'Guardar'}
             </button>
-            <button type="button" onClick={() => setShowModal(false)} className="bg-gray-600 px-4 py-2 rounded">
+            <button type="button" onClick={() => setShowModal(false)} className="bg-surface px-4 py-2 rounded">
               Cancelar
             </button>
           </div>
@@ -289,7 +295,7 @@ export const UsuariosPage = () => {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
               required
               minLength={6}
             />
@@ -300,7 +306,7 @@ export const UsuariosPage = () => {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full border border-gray-600 bg-gray-700 text-gray-100 p-2 rounded"
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
               required
               minLength={6}
             />
@@ -309,7 +315,7 @@ export const UsuariosPage = () => {
             <button type="submit" disabled={changingPassword} className={`${changingPassword ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-4 py-2 rounded flex-1`}>
               {changingPassword ? 'Guardando...' : 'Guardar'}
             </button>
-            <button type="button" onClick={() => setShowPasswordModal(false)} className="bg-gray-600 px-4 py-2 rounded">
+            <button type="button" onClick={() => setShowPasswordModal(false)} className="bg-surface px-4 py-2 rounded">
               Cancelar
             </button>
           </div>

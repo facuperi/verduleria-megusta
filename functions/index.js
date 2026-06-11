@@ -300,3 +300,25 @@ exports.actualizarPassword = onCall(async (request) => {
 
   return { success: true };
 });
+
+exports.eliminarUsuario = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Debes iniciar sesión');
+  }
+
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+  if (!callerDoc.exists || callerDoc.data().rol !== 'gerente') {
+    throw new HttpsError('permission-denied', 'Solo gerentes pueden eliminar usuarios');
+  }
+
+  const { uid } = request.data;
+  if (!uid) {
+    throw new HttpsError('invalid-argument', 'Falta el UID del usuario');
+  }
+
+  await admin.auth().deleteUser(uid);
+  await admin.firestore().collection('users').doc(uid).delete();
+
+  return { success: true };
+});

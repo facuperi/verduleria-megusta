@@ -29,7 +29,6 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth();
       allow update: if (isAuth()
-        && resource.data.abiertoPor == request.auth.uid
         && resource.data.estado == 'abierta') || isGerente();
       allow delete: if false;
     }
@@ -48,6 +47,29 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth();
       allow update, delete: if isGerente();
+    }
+
+    match /ingresosCaja/{ingresoId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if false;
+    }
+
+    match /tiposIngreso/{tipoId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isGerente();
+    }
+
+    match /tiposDescuento/{tipoId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isGerente();
+    }
+
+    match /ultimoCierre/{sucursal} {
+      allow read: if isAuth();
+      allow write: if isAuth();
     }
   }
 }

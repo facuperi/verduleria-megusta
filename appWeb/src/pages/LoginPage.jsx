@@ -62,39 +62,39 @@ export const LoginPage = () => {
   return (
     <Layout>
       <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="bg-gray-800/50 p-8 rounded-lg shadow-sm border border-gray-700/50 w-full max-w-md">
+        <div className="bg-card p-8 rounded-lg shadow-sm border border-line w-full max-w-md">
           <h1 className="text-2xl font-bold text-center mb-6">Iniciar Sesión</h1>
           
           {error && (
-            <div className="bg-red-900/20 border border-red-600 text-red-300 px-4 py-3 rounded mb-4">
+            <div className="bg-red-soft border border-red text-red px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <label className="block text-gray-200 text-sm font-bold mb-2">
+              <label className="block text-secondary text-sm font-bold mb-2">
                 ID de usuario
               </label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-line-input bg-input text-body rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Tu ID"
                 required
               />
             </div>
 
             <div className="mb-6">
-              <label className="block text-gray-200 text-sm font-bold mb-2">
+              <label className="block text-secondary text-sm font-bold mb-2">
                 Contraseña
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-line-input bg-input text-body rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               />
             </div>

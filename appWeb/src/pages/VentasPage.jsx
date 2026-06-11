@@ -93,6 +93,11 @@ export const VentasPage = () => {
   const [iconoNuevoTipoDesc, setIconoNuevoTipoDesc] = useState('🏷️');
   const [creandoTipoDescuento, setCreandoTipoDescuento] = useState(false);
   
+  // Nota de crédito como descuento
+  const [notaCreditoOriginal, setNotaCreditoOriginal] = useState('');
+  const [mostrarInputNC, setMostrarInputNC] = useState(false);
+  const [nuevoSaldoFavor, setNuevoSaldoFavor] = useState(0);
+  
   // Modal facturación
   const [mostrarModalFactura, setMostrarModalFactura] = useState(false);
   const [tipoFacturaSeleccionado, setTipoFacturaSeleccionado] = useState(null);
@@ -121,15 +126,19 @@ export const VentasPage = () => {
   const total = Math.max(0, diferencia);
 
   const totalDescuentos = pagosSeleccionados.reduce((sum, p) => sum + calcularDescuento(p, diferencia), 0);
-  const totalConDescuento = Math.max(0, diferencia - totalDescuentos);
+  const montoBaseNC = Math.max(0, diferencia - totalDescuentos);
+  const montoNCReal = parseFloat(notaCreditoOriginal) || 0;
+  const notaCreditoDescuento = Math.min(montoNCReal, montoBaseNC);
+  const totalConDescuento = Math.max(0, montoBaseNC - notaCreditoDescuento);
+  const sobranteNC = Math.max(0, montoNCReal - notaCreditoDescuento);
 
   useEffect(() => {
     if (carrito.length === 0) return;
     setPagosSeleccionados(prev => {
       if (prev.length === 0) {
-        return [{ metodo: 'efectivo', monto: Math.max(0, diferencia), descuentoTipo: null, descuentoValor: 0 }];
+        return [{ metodo: 'efectivo', monto: Math.max(0, totalConDescuento), descuentoTipo: null, descuentoValor: 0 }];
       }
-      const target = Math.max(0, diferencia);
+      const target = Math.max(0, totalConDescuento);
       const sumActual = prev.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
       if (Math.abs(sumActual - target) < 0.01) return prev;
       const diff = Math.round((target - sumActual) * 100) / 100;
@@ -138,7 +147,7 @@ export const VentasPage = () => {
       updated[0] = { ...updated[0], monto: nuevo };
       return updated;
     });
-  }, [carrito.length, diferencia]);
+  }, [carrito.length, totalConDescuento, notaCreditoOriginal]);
 
   const tienePagoTarjeta = pagosSeleccionados.some(p => p.metodo === 'tarjeta');
 
@@ -407,11 +416,11 @@ export const VentasPage = () => {
     }
     if (carrito.length === 0) return;
     
-    if (diferencia > 0 && totalPagos !== totalConDescuento) {
+    if (totalConDescuento > 0 && totalPagos !== totalConDescuento) {
       setError(`El total de los pagos debe ser igual a $${totalConDescuento}`);
       return;
     }
-    if (diferencia <= 0 && totalPagos !== 0) {
+    if (totalConDescuento <= 0 && totalPagos !== 0) {
       setError('No hay monto a pagar. Los pagos deben ser $0');
       return;
     }
@@ -461,6 +470,9 @@ export const VentasPage = () => {
             montoReal: Math.max(0, (parseFloat(p.monto) || 0) - desc),
           };
         }),
+        notaCreditoDescuento: notaCreditoDescuento > 0 ? notaCreditoDescuento : undefined,
+        notaCreditoOriginal: montoNCReal > 0 ? montoNCReal : undefined,
+        nuevoSaldoFavor: sobranteNC > 0 ? sobranteNC : undefined,
         facturada: false,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
@@ -515,6 +527,10 @@ export const VentasPage = () => {
         updateData.totalDescuentos = (caja.totalDescuentos || 0) + totalDescuentosCaja;
       }
 
+      if (notaCreditoDescuento > 0) {
+        updateData.notaCreditoDescuento = (caja.notaCreditoDescuento || 0) + notaCreditoDescuento;
+      }
+
       if (Object.keys(updateData).length > 0) {
         await updateDoc(doc(db, 'caja', caja.id), updateData);
       }
@@ -529,6 +545,9 @@ export const VentasPage = () => {
       setFacturaData(null);
       setAgregarComoNotaCredito(false);
       setTipoDescuento('');
+      setNuevoSaldoFavor(sobranteNC);
+      setNotaCreditoOriginal('');
+      setMostrarInputNC(false);
       
       const pagosConDescuento = pagosSeleccionados.map(p => {
         const desc = calcularDescuento(p, diferencia);
@@ -548,6 +567,8 @@ export const VentasPage = () => {
         pagos: pagosConDescuento,
         tipoVenta,
         negocio: caja.sucursal,
+        notaCreditoDescuento: notaCreditoDescuento > 0 ? notaCreditoDescuento : undefined,
+        nuevoSaldoFavor: sobranteNC > 0 ? sobranteNC : undefined,
       };
       setVentaExitosa(nuevaVenta);
       
@@ -711,6 +732,15 @@ export const VentasPage = () => {
             onObservacionChange={setObservacion}
             onImprimirAFavor={() => imprimirTicketAFavor(diferencia, caja, user?.email)}
             onRealizarVenta={realizarVenta}
+            notaCreditoOriginal={notaCreditoOriginal}
+            mostrarInputNC={mostrarInputNC}
+            notaCreditoDescuento={notaCreditoDescuento}
+            sobranteNC={sobranteNC}
+            onNotaCreditoChange={setNotaCreditoOriginal}
+            onToggleInputNC={() => {
+              if (mostrarInputNC) setNotaCreditoOriginal('');
+              setMostrarInputNC(!mostrarInputNC);
+            }}
           />
 
           {ventaExitosa && (
@@ -719,13 +749,29 @@ export const VentasPage = () => {
                 <div>
                   <p className="font-bold">✅ Venta exitosa</p>
                   <p className="text-sm">Total: ${ventaExitosa.total}</p>
+                  {ventaExitosa.notaCreditoDescuento > 0 && (
+                    <p className="text-sm text-purple mt-1">NC aplicada: -${ventaExitosa.notaCreditoDescuento}</p>
+                  )}
+                  {ventaExitosa.nuevoSaldoFavor > 0 && (
+                    <p className="text-sm text-green font-semibold mt-1">Saldo a favor: $${ventaExitosa.nuevoSaldoFavor}</p>
+                  )}
                 </div>
-                <button
-                  onClick={() => imprimirTicketVenta(ventaExitosa, caja, facturaData)}
-                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                >
-                  🖨️ Imprimir Ticket
-                </button>
+                <div className="flex flex-col gap-1 items-end">
+                  <button
+                    onClick={() => imprimirTicketVenta(ventaExitosa, caja, facturaData)}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    🖨️ Imprimir Ticket
+                  </button>
+                  {ventaExitosa.nuevoSaldoFavor > 0 && (
+                    <button
+                      onClick={() => imprimirTicketAFavor && imprimirTicketAFavor(-ventaExitosa.nuevoSaldoFavor, caja, user?.email)}
+                      className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm"
+                    >
+                      🖨️ NC sobrante (${ventaExitosa.nuevoSaldoFavor})
+                    </button>
+                  )}
+                </div>
               </div>
               {!facturaData && !facturando && (
                 <div className="mt-2 flex gap-2">

@@ -2,8 +2,8 @@ export const EmptyState = ({ title, description, icon = '📭', action }) => {
   return (
     <div className="text-center py-12">
       <div className="text-5xl mb-4">{icon}</div>
-      <h3 className="text-lg font-semibold text-gray-700 mb-1">{title}</h3>
-      {description && <p className="text-sm text-gray-500 mb-4">{description}</p>}
+      <h3 className="text-lg font-semibold text-secondary mb-1">{title}</h3>
+      {description && <p className="text-sm text-muted mb-4">{description}</p>}
       {action && (
         <button
           onClick={action.onClick}

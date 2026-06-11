@@ -45,7 +45,7 @@ ${fecha}
       <head>
         <title>Nota de Crédito</title>
         <style>
-          body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
+          body { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 600; white-space: pre; margin: 0; padding: 5px; }
           @media print { body { margin: 0; } }
         </style>
       </head>
@@ -89,13 +89,20 @@ ${fechaCierre}    ${sucursalNombre}
    Descuentos:      -$${formatMonto(caja.totalDescuentos || 0)}
    VENTA NETA:      $${formatMonto(caja.ventaNeta)}
 ───────────────────────────────────
+  GASTOS:
+   Caja Roja:       -$${formatMonto(caja.gastosCajaRoja || 0)}
+   Otros Gastos:    -$${formatMonto(caja.gastosOtros || 0)}
+   Ingresos:        +$${formatMonto(caja.totalIngresos || 0)}
+───────────────────────────────────
   X METODO DE PAGO:
   Efectivo:       $${formatMonto(caja.ventasEfectivo)}
   Tarjeta:        $${formatMonto(caja.ventasTarjeta)}
   Debito:         $${formatMonto(caja.ventasDebito)}
-  MercadoPago:    $${formatMonto(caja.ventasMercadoPago)}
+  MP Arista:      $${formatMonto(caja.ventasMPArista)}
+  MP Yanet:       $${formatMonto(caja.ventasMPYanet)}
   Cuenta DNI:     $${formatMonto(caja.ventasCuentaDNI)}
 ───────────────────────────────────
+  EFECTIVO CAJA ANTERIOR: $${formatMonto(caja.saldoAnterior || 0)}
   SALDO APERTURA: $${formatMonto(caja.saldoApertura)}
   SALDO CIERRE:   $${formatMonto(caja.saldoCierre)}
   SALDO SISTEMA:  $${formatMonto(caja.saldoSistema)}
@@ -122,7 +129,7 @@ ${fechaCierre}    ${sucursalNombre}
         <head>
           <title>Cierre de Caja</title>
           <style>
-            body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
+            body { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 600; white-space: pre; margin: 0; padding: 5px; }
             @media print { body { margin: 0; } }
           </style>
         </head>
@@ -192,11 +199,16 @@ IVA 21%:              $${ivaFormateado.padStart(8)}
 TOTAL:                $${totalFormateado.padStart(8)}
 ───────────────────────────────────`;
 
+  if (ventaExitosa.notaCreditoDescuento) {
+    ticket += `
+ Nota Credito:   -$${ventaExitosa.notaCreditoDescuento.toLocaleString('es-AR').padStart(8)}`;
+  }
+
   ticket += `
- PAGOS:`;
+  PAGOS:`;
   if (ventaExitosa.pagos && ventaExitosa.pagos.length > 0) {
     for (const p of ventaExitosa.pagos) {
-      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', mercadopagoarista: 'MP Arista', mercadopagoyanet: 'MP Yanet', cuentadni: 'Cuenta DNI' };
       const nombre = (nombres[p.metodo] || p.metodo).padEnd(10);
       const montoReal = p.montoReal || 0;
       const desc = (p.monto || 0) - montoReal;
@@ -210,7 +222,7 @@ TOTAL:                $${totalFormateado.padStart(8)}
     }
   } else {
     for (const metodo of ventaExitosa.tipoPago) {
-      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', mercadopagoarista: 'MP Arista', mercadopagoyanet: 'MP Yanet', cuentadni: 'Cuenta DNI' };
       ticket += `
  ${(nombres[metodo] || metodo).padEnd(10)}`;
     }
@@ -241,7 +253,7 @@ TOTAL:                $${totalFormateado.padStart(8)}
       <head>
         <title>Ticket de Venta</title>
         <style>
-          body { font-family: 'Courier New', monospace; font-size: 11px; white-space: pre; margin: 0; padding: 5px; }
+          body { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 600; white-space: pre; margin: 0; padding: 5px; }
           @media print { body { margin: 0; } }
         </style>
       </head>

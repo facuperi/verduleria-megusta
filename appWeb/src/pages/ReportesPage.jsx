@@ -23,6 +23,7 @@ export const ReportesPage = () => {
   const [negocio, setNegocio] = useState('todos');
   const [tipoMovimiento, setTipoMovimiento] = useState('todos');
   const [tipoRetiro, setTipoRetiro] = useState('todos');
+  const [tipoIngreso, setTipoIngreso] = useState('todos');
   const [metodoPago, setMetodoPago] = useState('todos');
   const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +33,7 @@ export const ReportesPage = () => {
   const [migrandoCajas, setMigrandoCajas] = useState(false);
   const [cajasPendientes, setCajasPendientes] = useState(0);
   const [tiposRetiroPersonalizados, setTiposRetiroPersonalizados] = useState({});
+  const [tiposIngresoPersonalizados, setTiposIngresoPersonalizados] = useState({});
   const [productos, setProductos] = useState([]);
   const [productosSeleccionados, setProductosSeleccionados] = useState([]);
   const [busquedaProducto, setBusquedaProducto] = useState('');
@@ -117,11 +119,20 @@ export const ReportesPage = () => {
         const montoVentasNormales = ventasNormales.reduce((sum, v) => sum + (v.totalVenta || v.total), 0);
         const montoNotasCredito = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
 
-        const ventasEfectivo = ventasNormales.filter(v => v.tipoPago?.includes('efectivo')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
-        const ventasTarjeta = ventasNormales.filter(v => v.tipoPago?.includes('tarjeta')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
-        const ventasDebito = ventasNormales.filter(v => v.tipoPago?.includes('debito')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
-        const ventasMercadoPago = ventasNormales.filter(v => v.tipoPago?.includes('mercadopago')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
-        const ventasCuentaDNI = ventasNormales.filter(v => v.tipoPago?.includes('cuentadni')).reduce((sum, v) => sum + (v.diferencia > 0 ? v.diferencia : v.total), 0);
+        const sumarPagos = (metodo, ventas) => ventas.reduce((sum, v) => {
+          if (v.pagos && v.pagos.length > 0) {
+            const pago = v.pagos.find(p => p.metodo === metodo);
+            return sum + (pago?.monto || 0);
+          }
+          return sum + (v.tipoPago?.includes(metodo) ? (v.total || v.diferencia || 0) : 0);
+        }, 0);
+
+        const ventasEfectivo = sumarPagos('efectivo', ventasNormales);
+        const ventasTarjeta = sumarPagos('tarjeta', ventasNormales);
+        const ventasDebito = sumarPagos('debito', ventasNormales);
+        const ventasMPArista = sumarPagos('mercadopagoarista', ventasNormales);
+        const ventasMPYanet = sumarPagos('mercadopagoyanet', ventasNormales);
+        const ventasCuentaDNI = sumarPagos('cuentadni', ventasNormales);
 
         const ventaNeta = montoVentasNormales - montoNotasCredito;
         const retirosSnapshot = await getDocs(collection(db, 'retirosCaja'));
@@ -131,14 +142,18 @@ export const ReportesPage = () => {
         const saldoSistema = efectivoCaja;
         const diferencia = (caja.saldoCierre || 0) - saldoSistema;
 
+        const notaCreditoDescuentoTotal = ventas.reduce((sum, v) => sum + (v.notaCreditoDescuento || 0), 0);
+
         await updateDoc(doc(db, 'caja', caja.id), {
           ventasBrutas: montoVentasNormales,
           notaCreditoTotal: montoNotasCredito,
+          notaCreditoDescuento: notaCreditoDescuentoTotal,
           ventaNeta,
           ventasEfectivo,
           ventasTarjeta,
           ventasDebito,
-          ventasMercadoPago,
+          ventasMPArista,
+          ventasMPYanet,
           ventasCuentaDNI,
           efectivoCaja,
           saldoSistema,
@@ -229,6 +244,12 @@ export const ReportesPage = () => {
         .map(doc => ({ id: doc.id, ...doc.data(), origen: 'retiros' }))
         .filter(r => esFechaEnRango(r.fecha));
 
+      // 2b. Cargar ingresos
+      const ingresosSnapshot = await getDocs(collection(db, 'ingresosCaja'));
+      let ingresosData = ingresosSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data(), origen: 'ingresos', esIngreso: true }))
+        .filter(r => esFechaEnRango(r.fecha));
+
       // 3. Cargar cajas (aperturas/cierres)
       const cajaSnapshot = await getDocs(collection(db, 'caja'));
       let cajaData = cajaSnapshot.docs
@@ -236,7 +257,7 @@ export const ReportesPage = () => {
         .filter(c => esFechaEnRango(c.fecha));
 
       // Unir todo
-      const todos = [...ventasData, ...retirosData, ...cajaData];
+      const todos = [...ventasData, ...retirosData, ...ingresosData, ...cajaData];
       
       // Ordenar por fecha descendente
       todos.sort((a, b) => {
@@ -254,6 +275,14 @@ export const ReportesPage = () => {
         tiposObj[doc.id] = { nombre: doc.data().nombre, icono: doc.data().icono };
       });
       setTiposRetiroPersonalizados(tiposObj);
+
+      // Cargar tipos de ingresos personalizados
+      const tiposIngresoSnapshot = await getDocs(collection(db, 'tiposIngreso'));
+      const tiposIngresoObj = {};
+      tiposIngresoSnapshot.docs.forEach(doc => {
+        tiposIngresoObj[doc.id] = { nombre: doc.data().nombre, icono: doc.data().icono };
+      });
+      setTiposIngresoPersonalizados(tiposIngresoObj);
       
       // Aplicar filtros automáticamente después de cargar
       aplicarFiltros(todos);
@@ -295,9 +324,9 @@ export const ReportesPage = () => {
     .filter(m => {
       // Filtro por tipo de movimiento
       if (tipoMovimiento === 'todos') return true;
-      if (tipoMovimiento === 'ventas') return m.origen === 'ventas' && m.tipoVenta !== 'notaCredito' && !(m.tipoVenta === 'mixta' && m.diferencia < 0);
-      if (tipoMovimiento === 'notasCredito') return m.tipoVenta === 'notaCredito' || (m.tipoVenta === 'mixta' && m.diferencia < 0);
+      if (tipoMovimiento === 'ventasNC') return m.origen === 'ventas';
       if (tipoMovimiento === 'retiros') return m.origen === 'retiros';
+      if (tipoMovimiento === 'ingresos') return m.origen === 'ingresos';
       if (tipoMovimiento === 'apertura') return m.origen === 'caja' && m.estado === 'abierta';
       if (tipoMovimiento === 'cierre') return m.origen === 'caja' && m.estado === 'cerrada';
       return true;
@@ -308,20 +337,24 @@ export const ReportesPage = () => {
       return m.tipo === tipoRetiro;
     })
     .filter(m => {
+      if (tipoMovimiento !== 'ingresos' || tipoIngreso === 'todos') return true;
+      return m.tipo === tipoIngreso;
+    })
+    .filter(m => {
       // Filtro por método de pago
-      if (tipoMovimiento !== 'ventas' && tipoMovimiento !== 'todos') return true;
+      if (tipoMovimiento !== 'ventasNC' && tipoMovimiento !== 'todos') return true;
       if (metodoPago === 'todos') return true;
       return m.tipoPago?.includes(metodoPago);
     })
     .filter(m => {
       // Filtro por productos seleccionados
-      if (tipoMovimiento !== 'ventas' || productosSeleccionados.length === 0) return true;
+      if (tipoMovimiento !== 'ventasNC' || productosSeleccionados.length === 0) return true;
       const productosVenta = m.productos?.map(p => p.productoId || p.id) || [];
       return productosVenta.some(pid => productosSeleccionados.includes(pid));
     })
     .filter(m => {
       // Filtro por facturación
-      if (tipoMovimiento !== 'ventas' && tipoMovimiento !== 'todos') return true;
+      if (tipoMovimiento !== 'ventasNC' && tipoMovimiento !== 'todos') return true;
       if (facturaFilter === 'facturadas') return !!m.cae;
       if (facturaFilter === 'sinFacturar') return !m.cae;
       return true;
@@ -340,6 +373,10 @@ export const ReportesPage = () => {
     .filter(m => m.origen === 'retiros')
     .reduce((sum, m) => sum + m.monto, 0);
 
+  const ingresosTotal = movimientosFiltrados
+    .filter(m => m.origen === 'ingresos')
+    .reduce((sum, m) => sum + m.monto, 0);
+
   const totalDescuentos = movimientosFiltrados
     .filter(m => m.origen === 'ventas')
     .reduce((sum, m) => {
@@ -351,7 +388,11 @@ export const ReportesPage = () => {
       }, 0);
     }, 0);
 
-  const balance = ventasNormales - notasCredito - retirosTotal;
+  const notaCreditoDescuento = movimientosFiltrados
+    .filter(m => m.origen === 'ventas')
+    .reduce((sum, m) => sum + (m.notaCreditoDescuento || 0), 0);
+
+  const balance = ventasNormales - notasCredito - notaCreditoDescuento + ingresosTotal - retirosTotal;
 
   // ==== PASO 8: Detalle expandible ====
   const toggleFila = (id) => {
@@ -401,6 +442,20 @@ export const ReportesPage = () => {
         tipo = tipoFormateado;
         detalle = m.observacion || '-';
         monto = -m.monto;
+      } else if (m.origen === 'ingresos') {
+        const tiposIngresoFijos = [
+          { id: 'ventaDirecta', nombre: 'Venta Directa' },
+          { id: 'deposito', nombre: 'Depósito' },
+          { id: 'otroIngreso', nombre: 'Otro Ingreso' },
+        ];
+        const fijo = tiposIngresoFijos.find(t => t.id === m.tipo);
+        if (fijo) {
+          tipo = fijo.nombre;
+        } else {
+          tipo = tiposIngresoPersonalizados[m.tipo]?.nombre || m.tipo;
+        }
+        detalle = m.observacion || '-';
+        monto = m.monto;
       } else {
         tipo = m.estado === 'abierta' ? 'Apertura' : 'Cierre';
         detalle = `Saldo: $${m.saldoApertura || m.saldoCierre || 0}`;
@@ -458,7 +513,7 @@ export const ReportesPage = () => {
   if (!canAccess) {
     return (
       <Layout>
-        <div className="bg-yellow-900/20 border border-yellow-700 text-yellow-300 px-4 py-3 rounded">
+        <div className="bg-yellow-soft border border-yellow-line text-yellow px-4 py-3 rounded">
           {restriction.message || 'Solo los gerentes pueden ver reportes desde PC'}
         </div>
       </Layout>
@@ -497,6 +552,7 @@ export const ReportesPage = () => {
         negocio={negocio} setNegocio={setNegocio}
         tipoMovimiento={tipoMovimiento} setTipoMovimiento={setTipoMovimiento}
         tipoRetiro={tipoRetiro} setTipoRetiro={setTipoRetiro}
+        tipoIngreso={tipoIngreso} setTipoIngreso={setTipoIngreso}
         metodoPago={metodoPago} setMetodoPago={setMetodoPago}
         facturaFilter={facturaFilter} setFacturaFilter={setFacturaFilter}
         productosSeleccionados={productosSeleccionados} toggleProducto={toggleProducto} limpiarProductos={limpiarProductos}
@@ -508,11 +564,11 @@ export const ReportesPage = () => {
       />
 
       {movimientosFiltrados.length > 0 && (
-        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} retirosTotal={retirosTotal} totalDescuentos={totalDescuentos} balance={balance} />
+        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} notaCreditoDescuento={notaCreditoDescuento} retirosTotal={retirosTotal} ingresosTotal={ingresosTotal} totalDescuentos={totalDescuentos} balance={balance} />
       )}
 
       {movimientosFiltrados.length > 0 && (
-        <TablaReportes movimientosFiltrados={movimientosFiltrados} filasExpandidas={filasExpandidas} toggleFila={toggleFila} tiposRetiroPersonalizados={tiposRetiroPersonalizados} onReimprimirTicket={imprimirTicketCajaCerrada} />
+        <TablaReportes movimientosFiltrados={movimientosFiltrados} filasExpandidas={filasExpandidas} toggleFila={toggleFila} tiposRetiroPersonalizados={tiposRetiroPersonalizados} tiposIngresoPersonalizados={tiposIngresoPersonalizados} onReimprimirTicket={imprimirTicketCajaCerrada} />
       )}
 
       {movimientosFiltrados.length === 0 && movimientos.length > 0 && (
@@ -524,7 +580,7 @@ export const ReportesPage = () => {
       )}
 
       {!fechaDesde && !fechaHasta && (
-        <p className="text-center py-8 text-gray-400">Seleccioná un rango de fechas para buscar</p>
+        <p className="text-center py-8 text-muted">Seleccioná un rango de fechas para buscar</p>
       )}
     </Layout>
   );

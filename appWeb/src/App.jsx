@@ -30,7 +30,7 @@ const PrivateRoute = ({ children, requiredRole }) => {
   if (requiredRole && userRole !== requiredRole) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-red-600">No tienes acceso a esta página</div>
+        <div className="text-lg text-red">No tienes acceso a esta página</div>
       </div>
     );
   }
@@ -43,13 +43,13 @@ function App() {
   
   if (!apiKey || apiKey.includes('____')) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Configuración Requerida</h1>
-          <p className="text-gray-600 mb-4">Debes completar las credenciales de Firebase en el archivo <code>.env</code></p>
-          <p className="text-sm text-gray-500">1. Ve a Firebase Console</p>
-          <p className="text-sm text-gray-500">2. Project Settings - General</p>
-          <p className="text-sm text-gray-500">3. Copia las credenciales al archivo <code>.env</code></p>
+      <div className="flex items-center justify-center min-h-screen bg-page">
+        <div className="bg-card p-8 rounded-lg shadow-md max-w-md text-center">
+          <h1 className="text-2xl font-bold text-red mb-4">Configuración Requerida</h1>
+          <p className="text-secondary mb-4">Debes completar las credenciales de Firebase en el archivo <code>.env</code></p>
+          <p className="text-sm text-muted">1. Ve a Firebase Console</p>
+          <p className="text-sm text-muted">2. Project Settings - General</p>
+          <p className="text-sm text-muted">3. Copia las credenciales al archivo <code>.env</code></p>
         </div>
       </div>
     );
