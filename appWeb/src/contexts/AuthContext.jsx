@@ -11,9 +11,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedNegocio, setSelectedNegocioState] = useState(
-    sessionStorage.getItem('selectedNegocio') || null
-  );
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -26,8 +23,6 @@ export const AuthProvider = ({ children }) => {
         } else {
           setUser(null);
           setUserRole(null);
-          sessionStorage.removeItem('selectedNegocio');
-          setSelectedNegocioState(null);
         }
       } catch (err) {
         console.error('Error al cargar usuario:', err);
@@ -44,19 +39,7 @@ export const AuthProvider = ({ children }) => {
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
   const logout = useCallback(async () => {
-    sessionStorage.removeItem('selectedNegocio');
-    setSelectedNegocioState(null);
     await signOut(auth);
-  }, []);
-
-  const setSelectedNegocio = useCallback((negocio) => {
-    sessionStorage.setItem('selectedNegocio', negocio);
-    setSelectedNegocioState(negocio);
-  }, []);
-
-  const clearSelectedNegocio = useCallback(() => {
-    sessionStorage.removeItem('selectedNegocio');
-    setSelectedNegocioState(null);
   }, []);
 
   const value = {
@@ -66,9 +49,6 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isGerente: userRole === 'gerente',
-    selectedNegocio,
-    setSelectedNegocio,
-    clearSelectedNegocio,
   };
 
   return (

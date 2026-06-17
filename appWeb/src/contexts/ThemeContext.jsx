@@ -4,7 +4,7 @@ const ThemeContext = createContext({});
 
 export const useTheme = () => useContext(ThemeContext);
 
-const THEME_KEY = 'santos-theme';
+const THEME_KEY = 'megusta-theme';
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {

@@ -238,7 +238,7 @@ exports.crearUsuario = onCall(async (request) => {
   }
 
   const idNormalizado = id.toLowerCase().trim();
-  const email = `${idNormalizado}@santos.com`;
+  const email = `${idNormalizado}@megusta.com`;
 
   const existingUsers = await admin.firestore()
     .collection('users')

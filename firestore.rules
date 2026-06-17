@@ -67,7 +67,7 @@ service cloud.firestore {
       allow update, delete: if isGerente();
     }
 
-    match /ultimoCierre/{sucursal} {
+    match /ultimoCierre/{docId} {
       allow read: if isAuth();
       allow write: if isAuth();
     }

@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { getDocs } from 'firebase/firestore';
 import { getCajaAbierta } from '../services/cajaService';
 
-export const useCaja = (db, sucursal) => {
+export const useCaja = (db) => {
   const [caja, setCaja] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchCaja = useCallback(async () => {
-    if (!db || !sucursal) {
+    if (!db) {
       setCaja(null);
       setLoading(false);
       return;
@@ -16,7 +16,7 @@ export const useCaja = (db, sucursal) => {
     setLoading(true);
     setError(null);
     try {
-      const q = getCajaAbierta(db, sucursal);
+      const q = getCajaAbierta(db);
       const snapshot = await getDocs(q);
       setCaja(snapshot.empty ? null : { id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
     } catch (err) {
@@ -24,7 +24,7 @@ export const useCaja = (db, sucursal) => {
     } finally {
       setLoading(false);
     }
-  }, [db, sucursal]);
+  }, [db]);
 
   useEffect(() => {
     fetchCaja();

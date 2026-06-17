@@ -1,7 +1,7 @@
 import { collection, getDocs, addDoc, updateDoc, doc, getDoc, setDoc, query, where, orderBy } from 'firebase/firestore';
 
-export const getCajaAbierta = (db, sucursal) => query(
-  collection(db, 'caja'), where('sucursal', '==', sucursal), where('estado', '==', 'abierta')
+export const getCajaAbierta = (db) => query(
+  collection(db, 'caja'), where('estado', '==', 'abierta')
 );
 export const abrirCaja = (db, data) => addDoc(collection(db, 'caja'), data);
 export const cerrarCaja = (db, id, data) => updateDoc(doc(db, 'caja', id), data);
@@ -20,9 +20,9 @@ export const getIngresosByCaja = (db, cajaId) => query(
   collection(db, 'ingresosCaja'), where('cajaId', '==', cajaId), orderBy('fecha', 'desc')
 );
 
-export const getUltimoCierre = (db, sucursal) =>
-  getDoc(doc(db, 'ultimoCierre', sucursal));
+export const getUltimoCierre = (db) =>
+  getDoc(doc(db, 'ultimoCierre', 'unico'));
 
-export const setUltimoCierre = (db, sucursal, data) =>
-  setDoc(doc(db, 'ultimoCierre', sucursal), data, { merge: true });
+export const setUltimoCierre = (db, data) =>
+  setDoc(doc(db, 'ultimoCierre', 'unico'), data, { merge: true });
 

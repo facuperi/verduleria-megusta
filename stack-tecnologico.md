@@ -1,4 +1,4 @@
-# Stack Tecnológico - Sistema de Facturación para Negocio de Ropa
+# Stack Tecnológico - Sistema de Facturación para Verdulería
 
 ## Requisitos del Proyecto
 
@@ -31,7 +31,7 @@
 | Servicio | Tecnología | Justificación |
 |----------|-------------|---------------|
 | Cloud DB | Firebase Firestore | Base de datos NoSQL en tiempo real, cloud-native, escala automática |
-| Storage | Firebase Cloud Storage |存储 de imágenes de productos (fotos de ropa) |
+| Storage | Firebase Cloud Storage | Almacenamiento de imágenes de productos |
 
 ### Despliegue
 

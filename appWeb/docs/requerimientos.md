@@ -1,4 +1,4 @@
-# Sistema de Facturación - Negocio de Ropa
+# Sistema de Facturación - Verdulería Me Gusta
 
 ## 1. Roles y Permisos
 

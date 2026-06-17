@@ -1,24 +1,16 @@
 export const TELEFONO = '2915245537';
 
-export const getDireccion = (sucursal) => {
-  if (sucursal === 'chiclana') return 'Chiclana 115';
-  if (sucursal === 'belgrano') return 'Belgrano 84';
-  return sucursal;
-};
+export const getDireccion = () => 'Dirección del local';
 
-export const getSucursalNombre = (sucursal) => {
-  if (sucursal === 'chiclana') return 'CHICLANA';
-  if (sucursal === 'belgrano') return 'BELGRANO';
-  return (sucursal || '').toUpperCase();
-};
+export const getSucursalNombre = () => '';
 
 export const imprimirTicketAFavor = (diferencia, caja, userEmail) => {
   const monto = Math.abs(diferencia);
   const fecha = new Date().toLocaleString('es-AR');
-  const direccion = getDireccion(caja.sucursal);
+  const direccion = getDireccion();
 
   const ticket = `====================================
-      SANTOS Y SANTAS
+       ME GUSTA
     ${direccion}
     Tel: ${TELEFONO}
 ==================================
@@ -32,7 +24,6 @@ ${fecha}
   cliente tiene saldo a favor
   de $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
 ───────────────────────────────────
-  Negocio: ${(caja.sucursal || '').toUpperCase()}
   Atendido por: ${userEmail || 'Usuario'}
 ===================================
       Gracias por su compra!
@@ -67,21 +58,20 @@ export const imprimirTicketCajaCerrada = (caja) => {
     if (!caja || caja.estado !== 'cerrada') return;
 
     const formatMonto = (monto) => (monto || 0).toLocaleString('es-AR').padStart(8);
-    const direccion = getDireccion(caja.sucursal);
-    const sucursalNombre = getSucursalNombre(caja.sucursal);
+  const direccion = getDireccion();
     const fechaApertura = caja.fecha ? new Date(caja.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
     const fechaCierre = caja.horaCierre ? new Date(caja.horaCierre).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
     const ticket = `====================================
-      SANTOS Y SANTAS
+       ME GUSTA
     ${direccion}
     Tel: ${TELEFONO}
 ===================================
      CIERRE DE CAJA
-${fechaCierre}    ${sucursalNombre}
+                ${fechaCierre}
 ───────────────────────────────────
- APERTURA: ${fechaApertura}
- CIERRE:   ${fechaCierre}
+  APERTURA: ${fechaApertura}
+  CIERRE:   ${fechaCierre}
 ───────────────────────────────────
   RESUMEN:
    Ventas Brutas:   $${formatMonto((caja.ventaNeta || 0) + (caja.totalDescuentos || 0) + (caja.notaCreditoTotal || 0))}
@@ -98,8 +88,7 @@ ${fechaCierre}    ${sucursalNombre}
   Efectivo:       $${formatMonto(caja.ventasEfectivo)}
   Tarjeta:        $${formatMonto(caja.ventasTarjeta)}
   Debito:         $${formatMonto(caja.ventasDebito)}
-  MP Arista:      $${formatMonto(caja.ventasMPArista)}
-  MP Yanet:       $${formatMonto(caja.ventasMPYanet)}
+  Mercado Pago:   $${formatMonto(caja.ventasMercadoPago)}
   Cuenta DNI:     $${formatMonto(caja.ventasCuentaDNI)}
 ───────────────────────────────────
   EFECTIVO CAJA ANTERIOR: $${formatMonto(caja.saldoAnterior || 0)}
@@ -147,12 +136,12 @@ export const imprimirTicketVenta = (ventaExitosa, caja, facturaData) => {
   if (!ventaExitosa || !caja) return;
 
   const fecha = new Date().toLocaleString('es-AR');
-  const direccion = getDireccion(caja.sucursal);
+  const direccion = getDireccion();
   const ventaId = ventaExitosa.id.slice(-6).toUpperCase();
   const { neto, iva } = calcularIva(ventaExitosa.total);
 
   let ticket = `====================================
-      SANTOS Y SANTAS
+      ME GUSTA
     ${direccion}
     Tel: ${TELEFONO}
 ===================================
@@ -208,7 +197,7 @@ TOTAL:                $${totalFormateado.padStart(8)}
   PAGOS:`;
   if (ventaExitosa.pagos && ventaExitosa.pagos.length > 0) {
     for (const p of ventaExitosa.pagos) {
-      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', mercadopagoarista: 'MP Arista', mercadopagoyanet: 'MP Yanet', cuentadni: 'Cuenta DNI' };
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
       const nombre = (nombres[p.metodo] || p.metodo).padEnd(10);
       const montoReal = p.montoReal || 0;
       const desc = (p.monto || 0) - montoReal;
@@ -222,7 +211,7 @@ TOTAL:                $${totalFormateado.padStart(8)}
     }
   } else {
     for (const metodo of ventaExitosa.tipoPago) {
-      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', mercadopagoarista: 'MP Arista', mercadopagoyanet: 'MP Yanet', cuentadni: 'Cuenta DNI' };
+      const nombres = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', debito: 'Débito', mercadopago: 'MercadoPago', cuentadni: 'Cuenta DNI' };
       ticket += `
  ${(nombres[metodo] || metodo).padEnd(10)}`;
     }

@@ -66,11 +66,11 @@ export const Layout = ({ children }) => {
           <div className="flex flex-col flex-1 min-h-0 bg-sidebar border-r border-line">
             <div className="flex items-center gap-3 px-6 py-5 border-b border-line">
               <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm">S</span>
+                <span className="text-white font-bold text-sm">M</span>
               </div>
               <div>
-                <h1 className="text-base font-bold text-body leading-tight">santos</h1>
-                <p className="text-xs text-muted leading-tight">Sistema de gestión</p>
+                <h1 className="text-base font-bold text-body leading-tight">ME GUSTA</h1>
+                <p className="text-xs text-muted leading-tight">Verdulería</p>
               </div>
             </div>
 
@@ -130,11 +130,11 @@ export const Layout = ({ children }) => {
             <div className="flex items-center justify-between px-4 py-4 border-b border-line">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-xs">S</span>
+                  <span className="text-white font-bold text-xs">M</span>
                 </div>
                 <div>
-                  <h1 className="text-sm font-bold text-body leading-tight">santos</h1>
-                  <p className="text-[10px] text-muted leading-tight">Sistema de gestión</p>
+                  <h1 className="text-sm font-bold text-body leading-tight">ME GUSTA</h1>
+                  <p className="text-[10px] text-muted leading-tight">Verdulería</p>
                 </div>
               </div>
               <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-lg hover:bg-card">
@@ -204,9 +204,9 @@ export const Layout = ({ children }) => {
               </button>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-[10px]">S</span>
+                  <span className="text-white font-bold text-[10px]">M</span>
                 </div>
-                <span className="font-bold text-body text-sm">santos</span>
+                <span className="font-bold text-body text-sm">ME GUSTA</span>
               </div>
               <div className="w-10" />
             </div>

@@ -11,12 +11,4 @@ export const getVentasByDate = (db, start, end) => query(
   orderBy('fecha', 'desc')
 );
 
-export const getVentasByDateAndSucursal = (db, start, end, sucursal) => query(
-  collection(db, 'ventas'),
-  where('fecha', '>=', start),
-  where('fecha', '<=', end),
-  where('sucursal', '==', sucursal),
-  orderBy('fecha', 'desc')
-);
-
 export const getAllVentas = (db) => getDocs(collection(db, 'ventas'));
