@@ -93,7 +93,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, 
                   </td>
                   <td className="py-2 text-secondary">
                     {item.tipoPago?.map(p => {
-                      const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP', mercadopagoarista: 'MPA', mercadopagoyanet: 'MPY', cuentadni: 'DNI' };
+                      const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP', cuentadni: 'DNI' };
                       return nombres[p] || p;
                     }).join(', ') || '-'}
                     {(() => {

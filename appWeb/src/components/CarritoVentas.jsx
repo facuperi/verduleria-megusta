@@ -1,11 +1,11 @@
+import { formatNum } from '../utils/format';
 import { EmptyState } from './EmptyState';
 
 const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
   { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopagoarista', nombre: 'MP Arista' },
-  { id: 'mercadopagoyanet', nombre: 'MP Yanet' },
+  { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
@@ -16,6 +16,8 @@ const calcularDescuento = (pago, totalBase = 0) => {
   if (pago.descuentoTipo === 'fijo') return valor;
   return 0;
 };
+
+const esPesable = (tipo) => tipo === 'pesable' || tipo === 'pesableConStock';
 
 export const CarritoVentas = ({
   carrito,
@@ -31,23 +33,25 @@ export const CarritoVentas = ({
   totalDescuentos,
   totalConDescuento,
   error,
-  tipoPrecioGlobal,
   tiposDescuento,
   tipoDescuento,
+  pesoActual,
+  conectandoBalanza,
   onChangeTipoDescuento,
   onAbrirModalTipoDesc,
   onCambiarCantidad,
   onQuitarDelCarrito,
-  onTogglePrecioGlobal,
   onToggleNotaCredito,
   onPagoChange,
   onDescuentoTipo,
+  onDescuento10,
   onMontoBlur,
   onAgregarMetodoPago,
   onQuitarMetodoPago,
   onObservacionChange,
   onImprimirAFavor,
   onRealizarVenta,
+  onConectarBalanza,
   notaCreditoOriginal,
   mostrarInputNC,
   notaCreditoDescuento,
@@ -67,26 +71,9 @@ export const CarritoVentas = ({
         <EmptyState title="El carrito está vacío" icon="🛒" />
       ) : (
         <div className="bg-card p-4 rounded-lg shadow-sm border border-line mb-4">
-          <div className="flex items-center justify-between mb-3 pb-3 border-b border-line">
-            <span className="text-sm font-semibold text-secondary">Tipo de precio</span>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-semibold transition-colors ${tipoPrecioGlobal === 'efectivo' ? 'text-green' : 'text-icon'}`}>
-                Efectivo
-              </span>
-              <button
-                onClick={onTogglePrecioGlobal}
-                className={`relative w-14 h-7 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue ${tipoPrecioGlobal === 'tarjeta' ? 'bg-blue-600' : 'bg-green-600'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${tipoPrecioGlobal === 'tarjeta' ? 'translate-x-7' : 'translate-x-0'}`} />
-              </button>
-              <span className={`text-xs font-semibold transition-colors ${tipoPrecioGlobal === 'tarjeta' ? 'text-blue' : 'text-icon'}`}>
-                Tarjeta
-              </span>
-            </div>
-          </div>
           {carrito.map((item, index) => {
-            const precio = item.precioSeleccionado === 'tarjeta' ? item.precioTarjeta : item.precioEfectivo;
-            const itemKey = `${item.id}-${item.precioSeleccionado}`;
+            const precio = esPesable(item.tipo) ? (item.precio || 0) * (item.peso || 0) : item.precio;
+            const itemKey = `${item.id}`;
             return (
               <div key={itemKey} className={`py-2 border-b border-line ${item.esNotaCredito ? 'bg-red-soft -mx-4 px-4' : ''}`}>
                 <div className="flex justify-between items-start">
@@ -95,39 +82,45 @@ export const CarritoVentas = ({
                       {item.esNotaCredito && '⚠️ '}{item.nombre}
                     </p>
                     <p className="text-xs text-muted">
-                      ${precio} x {item.cantidad}
+                      {esPesable(item.tipo)
+                        ? `$${formatNum(item.precio)} x ${item.peso}kg = $${formatNum(precio)}`
+                        : `$${formatNum(precio)} x ${item.cantidad}`}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => onCambiarCantidad(item.id, item.precioSeleccionado, item.cantidad - 1)}
-                      className="text-muted hover:text-body"
-                    >
-                      -
-                    </button>
-                    <span className="text-sm">{item.cantidad}</span>
-                    <button
-                      onClick={() => onCambiarCantidad(item.id, item.precioSeleccionado, item.cantidad + 1)}
-                      className="text-muted hover:text-body"
-                    >
-                      +
-                    </button>
-                  </div>
+                  {!esPesable(item.tipo) && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onCambiarCantidad(item.id, item.cantidad - 1)}
+                        className="text-muted hover:text-body"
+                      >
+                        -
+                      </button>
+                      <span className="text-sm">{item.cantidad}</span>
+                      <button
+                        onClick={() => onCambiarCantidad(item.id, item.cantidad + 1)}
+                        className="text-muted hover:text-body"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
                   <button
-                    onClick={() => onQuitarDelCarrito(item.id, item.precioSeleccionado)}
+                    onClick={() => onQuitarDelCarrito(item.id)}
                     className="text-red hover:text-red ml-2"
                   >
                     ✕
                   </button>
                 </div>
-                <div className="mt-1 flex items-center justify-end">
-                  <button
-                    onClick={() => onToggleNotaCredito(item.id, item.precioSeleccionado)}
-                    className={`text-xs px-2 py-0.5 rounded border ${item.esNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-elevated text-secondary border-line'}`}
-                  >
-                    {item.esNotaCredito ? 'Nota Crédito' : 'Venta'}
-                  </button>
-                </div>
+                {!esPesable(item.tipo) && (
+                  <div className="mt-1 flex items-center justify-end">
+                    <button
+                      onClick={() => onToggleNotaCredito(item.id)}
+                      className={`text-xs px-2 py-0.5 rounded border ${item.esNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-elevated text-secondary border-line'}`}
+                    >
+                      {item.esNotaCredito ? 'Nota Crédito' : 'Venta'}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -135,10 +128,10 @@ export const CarritoVentas = ({
           <div className="mt-4 pt-4 border-t border-line">
             {totalNotaCredito > 0 && (
               <div className="text-sm mb-2">
-                <p className="text-red">Nota Crédito: -${totalNotaCredito}</p>
+                <p className="text-red">Nota Crédito: -${formatNum(totalNotaCredito)}</p>
                 {diferencia < 0 && (
                   <div className="flex items-center justify-between bg-green-soft p-2 rounded mt-1">
-                    <p className="text-green font-semibold">A favor: $${Math.abs(diferencia)}</p>
+                    <p className="text-green font-semibold">A favor: $${formatNum(Math.abs(diferencia))}</p>
                     <button
                       onClick={onImprimirAFavor}
                       className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
@@ -148,14 +141,14 @@ export const CarritoVentas = ({
                   </div>
                 )}
                 {diferencia > 0 && (
-                  <p className="text-blue">El cliente debe pagar: ${diferencia}</p>
+                  <p className="text-blue">El cliente debe pagar: ${formatNum(diferencia)}</p>
                 )}
                 {diferencia === 0 && (
                   <p className="text-secondary">Sin costo adicional</p>
                 )}
               </div>
             )}
-            <p className="text-xl font-bold">Total: ${total}</p>
+            <p className="text-xl font-bold">Total: ${formatNum(total)}</p>
           </div>
 
           {totalNotaCredito > 0 && (
@@ -180,11 +173,11 @@ export const CarritoVentas = ({
             const desc = calcularDescuento(pago, diferencia);
             const montoReal = Math.max(0, (parseFloat(pago.monto) || 0) - desc);
             return (
-              <div key={idx} className="flex gap-1 mb-2 items-center flex-wrap">
+              <div key={idx} className="flex gap-1 mb-1.5 items-center">
                 <select
                   value={pago.metodo}
                   onChange={(e) => onPagoChange(idx, 'metodo', e.target.value)}
-                  className="flex-1 min-w-[100px] border border-line-input bg-input text-body rounded p-2 text-sm"
+                  className="w-24 border border-line-input bg-input text-body rounded px-1.5 py-1 text-xs"
                 >
                   {METODOS_PAGO.map(m => (
                     <option key={m.id} value={m.id}>{m.nombre}</option>
@@ -195,38 +188,45 @@ export const CarritoVentas = ({
                   value={pago.monto}
                   onChange={(e) => onPagoChange(idx, 'monto', e.target.value)}
                   onBlur={() => onMontoBlur(idx)}
-                  className="w-20 border border-line-input bg-input text-body rounded p-2 text-sm text-right"
+                  className="w-16 border border-line-input bg-input text-body rounded px-1.5 py-1 text-xs text-right"
                   placeholder="0"
                 />
                 <input
                   type="number"
                   value={pago.descuentoValor}
                   onChange={(e) => onPagoChange(idx, 'descuentoValor', e.target.value)}
-                  className={`w-16 border border-line-input bg-input text-body rounded p-2 text-sm text-right ${!pago.descuentoTipo ? 'opacity-40' : ''}`}
+                  className={`w-12 border border-line-input bg-input text-body rounded px-1.5 py-1 text-xs text-right ${!pago.descuentoTipo ? 'opacity-40' : ''}`}
                   placeholder="0"
                   disabled={!pago.descuentoTipo}
                 />
                 <button
                   onClick={() => onDescuentoTipo(idx, 'porcentaje')}
-                  className={`px-2 py-2 text-sm font-bold rounded border ${pago.descuentoTipo === 'porcentaje' ? 'bg-blue-600 text-white border-blue-600' : 'bg-elevated text-secondary border-line'}`}
-                  title="Descuento porcentual"
+                  className={`px-1.5 py-1 text-xs font-bold rounded border leading-none ${pago.descuentoTipo === 'porcentaje' && pago.descuentoValor != 10 ? 'bg-blue-600 text-white border-blue-600' : 'bg-elevated text-secondary border-line'}`}
+                  title="Descuento %"
                 >
                   %
                 </button>
                 <button
+                  onClick={() => onDescuento10(idx)}
+                  className={`px-1.5 py-1 text-xs font-bold rounded border leading-none ${pago.descuentoTipo === 'porcentaje' && pago.descuentoValor == 10 ? 'bg-blue-600 text-white border-blue-600' : 'bg-elevated text-secondary border-line'}`}
+                  title="10% de descuento"
+                >
+                  10%
+                </button>
+                <button
                   onClick={() => onDescuentoTipo(idx, 'fijo')}
-                  className={`px-2 py-2 text-sm font-bold rounded border ${pago.descuentoTipo === 'fijo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-elevated text-secondary border-line'}`}
+                  className={`px-1.5 py-1 text-xs font-bold rounded border leading-none ${pago.descuentoTipo === 'fijo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-elevated text-secondary border-line'}`}
                   title="Descuento fijo en $"
                 >
                   $D
                 </button>
                 {pago.descuentoTipo && desc > 0 && (
-                  <span className="text-xs text-green font-semibold whitespace-nowrap">
-                    ${montoReal.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                  <span className="text-[10px] text-green font-semibold whitespace-nowrap">
+                    -${montoReal.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                   </span>
                 )}
                 {pagosSeleccionados.length > 1 && (
-                  <button onClick={() => onQuitarMetodoPago(idx)} className="text-red hover:text-red">✕</button>
+                  <button onClick={() => onQuitarMetodoPago(idx)} className="text-red hover:text-red text-xs ml-0.5">✕</button>
                 )}
               </div>
             );
@@ -293,18 +293,34 @@ export const CarritoVentas = ({
           )}
 
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-line">
-            <div>
-              <p className="text-sm">Total: ${totalVenta.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
-              {totalDescuentos > 0 && (
-                <p className="text-sm text-green">Descuentos: -${totalDescuentos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
-              )}
-              {notaCreditoDescuento > 0 && (
-                <p className="text-sm text-purple">NC aplicada: -${notaCreditoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
-              )}
-              <p className="text-sm font-semibold">Total a pagar: ${totalConDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
-              <p className={`text-sm ${totalPagos === totalConDescuento ? 'text-green' : 'text-red'}`}>
-                Pagos: ${totalPagos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-              </p>
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-sm">Total: ${totalVenta.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+                {totalDescuentos > 0 && (
+                  <p className="text-sm text-green">Descuentos: -${totalDescuentos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+                )}
+                {notaCreditoDescuento > 0 && (
+                  <p className="text-sm text-purple">NC aplicada: -${notaCreditoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+                )}
+                <p className="text-sm font-semibold">Total a pagar: ${totalConDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
+                <p className={`text-sm ${totalPagos === totalConDescuento ? 'text-green' : 'text-red'}`}>
+                  Pagos: ${totalPagos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {pesoActual !== null && (
+                  <span className="text-sm font-semibold text-amber">
+                    ⚖️ Peso: {pesoActual} kg
+                  </span>
+                )}
+                <button
+                  onClick={onConectarBalanza}
+                  disabled={conectandoBalanza}
+                  className="text-xs px-2 py-1 rounded border bg-elevated text-secondary border-line hover:bg-card disabled:opacity-50"
+                >
+                  {conectandoBalanza ? 'Conectando...' : '🔗 Balanza'}
+                </button>
+              </div>
             </div>
             <button
               onClick={onRealizarVenta}

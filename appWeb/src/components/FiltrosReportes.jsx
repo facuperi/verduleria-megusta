@@ -3,11 +3,8 @@ import { useState, useEffect } from 'react';
 const TIPOS_RETIRO = [
   { id: 'cajaRoja', nombre: 'Caja roja', icono: '💰' },
   { id: 'gasto', nombre: 'Gasto', icono: '🧹' },
-  { id: 'retiroCaro', nombre: 'Retiro Caro', icono: '👔' },
-  { id: 'retiroFede', nombre: 'Retiro Fede', icono: '👔' },
-  { id: 'errorMP', nombre: 'Error MP', icono: '⚠️' },
-  { id: 'errorDNI', nombre: 'Error DNI', icono: '⚠️' },
-  { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
+  { id: 'pagoProveedor', nombre: 'Pago Proveedor', icono: '📦' },
+  { id: 'retiro', nombre: 'Retiro', icono: '💸' },
 ];
 
 const TIPOS_INGRESO = [
@@ -27,8 +24,6 @@ const TIPOS_MOVIMIENTO = [
 
 const NEGOCIOS = [
   { id: 'todos', nombre: 'Todos' },
-  { id: 'chiclana', nombre: 'Chiclana' },
-  { id: 'belgrano', nombre: 'Belgrano' },
 ];
 
 const METODOS_PAGO = [
@@ -36,8 +31,7 @@ const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
   { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopagoarista', nombre: 'MP Arista' },
-  { id: 'mercadopagoyanet', nombre: 'MP Yanet' },
+  { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
@@ -59,7 +53,6 @@ export const FiltrosReportes = ({
 }) => {
   const productosFiltrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-    p.codigoInterno?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
     p.codigoBarras?.toLowerCase().includes(busquedaProducto.toLowerCase())
   );
 
@@ -166,7 +159,7 @@ export const FiltrosReportes = ({
             >
               <option value="todos">Todas</option>
               <option value="facturadas">Facturadas</option>
-              <option value="sinFacturar">Efectivo y Yanet</option>
+              <option value="sinFacturar">Sin facturar</option>
             </select>
           </div>
         )}
@@ -217,7 +210,6 @@ export const FiltrosReportes = ({
                             onChange={() => toggleProducto(producto.id)}
                             className="rounded"
                           />
-                          <span className="text-xs text-muted w-16">{producto.codigoInterno}</span>
                           <span className="text-sm truncate">{producto.nombre}</span>
                         </label>
                       ))}
@@ -244,7 +236,7 @@ export const FiltrosReportes = ({
                       key={id}
                       className="inline-flex items-center gap-1 bg-indigo-soft text-indigo px-2 py-0.5 rounded text-xs"
                     >
-                      {prod.codigoInterno}
+                      {prod.nombre}
                       <button
                         onClick={() => toggleProducto(id)}
                         className="text-indigo hover:text-indigo"

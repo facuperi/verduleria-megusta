@@ -10,21 +10,14 @@ import { Modal } from '../components/Modal';
 import { ResumenCaja } from '../components/ResumenCaja';
 import { HistorialMovimientos } from '../components/HistorialMovimientos';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import { getDireccion, getSucursalNombre, TELEFONO } from '../utils/ticketPrinter';
-
-const NEGOCIOS = [
-  { id: 'chiclana', nombre: 'Chiclana' },
-  { id: 'belgrano', nombre: 'Belgrano' },
-];
+import { getDireccion, TELEFONO } from '../utils/ticketPrinter';
+import { formatNum } from '../utils/format';
 
 const TIPOS_RETIRO_FIJOS = [
   { id: 'cajaRoja', nombre: 'Caja roja', icono: '💰' },
   { id: 'gasto', nombre: 'Gasto', icono: '🧹' },
-  { id: 'retiroCaro', nombre: 'Retiro Caro', icono: '👔' },
-  { id: 'retiroFede', nombre: 'Retiro Fede', icono: '👔' },
-  { id: 'errorMP', nombre: 'Error MP', icono: '⚠️' },
-  { id: 'errorDNI', nombre: 'Error DNI', icono: '⚠️' },
-  { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
+  { id: 'pagoProveedor', nombre: 'Pago Proveedor', icono: '📦' },
+  { id: 'retiro', nombre: 'Retiro', icono: '💸' },
 ];
 
 const TIPOS_INGRESO_FIJOS = [
@@ -37,13 +30,12 @@ const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
   { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopagoarista', nombre: 'MP Arista' },
-  { id: 'mercadopagoyanet', nombre: 'MP Yanet' },
+  { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
 export const CajaPage = () => {
-  const { user, isGerente, selectedNegocio, setSelectedNegocio, clearSelectedNegocio } = useAuth();
+  const { user, isGerente } = useAuth();
   const { isMobile } = useDevice();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -110,21 +102,13 @@ export const CajaPage = () => {
       setLoading(false);
       return;
     }
-    if (!selectedNegocio) {
-      setCaja(null);
-      setVentasHoy([]);
-      setRetiros([]);
-      setLoading(false);
-      return;
-    }
 
     const fetchCaja = async () => {
       setLoading(true);
       try {
         const cajaQuery = query(
           collection(db, 'caja'),
-          where('estado', '==', 'abierta'),
-          where('sucursal', '==', selectedNegocio)
+          where('estado', '==', 'abierta')
         );
         const cajaSnapshot = await getDocs(cajaQuery);
         
@@ -135,8 +119,7 @@ export const CajaPage = () => {
           const fechaApertura = new Date(cajaData.fecha);
           const ventasQuery = query(
             collection(db, 'ventas'),
-            where('fecha', '>=', fechaApertura),
-            where('negocio', '==', cajaData.sucursal)
+            where('fecha', '>=', fechaApertura)
           );
           const ventasSnapshot = await getDocs(ventasQuery);
           setVentasHoy(ventasSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -174,20 +157,19 @@ export const CajaPage = () => {
       }
     };
     fetchCaja();
-  }, [user, selectedNegocio]);
+  }, [user]);
 
   useEffect(() => {
-    if (!selectedNegocio || caja || saldoAnterior !== null) return;
+    if (caja || saldoAnterior !== null) return;
     (async () => {
       let anterior = 0;
       try {
-        const snap = await getDoc(doc(db, 'ultimoCierre', selectedNegocio));
+        const snap = await getDoc(doc(db, 'ultimoCierre', 'unico'));
         if (snap.exists()) {
           anterior = snap.data().saldoCierre || 0;
         } else {
           const cajasSnap = await getDocs(query(
-            collection(db, 'caja'),
-            where('sucursal', '==', selectedNegocio)
+            collection(db, 'caja')
           ));
           if (!cajasSnap.empty) {
             const docs = cajasSnap.docs.map(d => d.data());
@@ -195,7 +177,7 @@ export const CajaPage = () => {
             const ultimaCerrada = docs.find(d => d.estado === 'cerrada');
             if (ultimaCerrada) {
               anterior = ultimaCerrada.saldoCierre || 0;
-              setDoc(doc(db, 'ultimoCierre', selectedNegocio), {
+              setDoc(doc(db, 'ultimoCierre', 'unico'), {
                 saldoCierre: anterior,
                 fecha: ultimaCerrada.fecha || new Date().toISOString(),
               }, { merge: true }).catch(() => {});
@@ -208,21 +190,19 @@ export const CajaPage = () => {
       setSaldoAnterior(anterior);
       setMostrarPromptAnterior(true);
     })();
-  }, [selectedNegocio, caja]);
+  }, [caja]);
 
   const abrirCaja = async () => {
-    if (!selectedNegocio) return;
     setProcesando(true);
     try {
       const yaAbierta = await getDocs(query(
         collection(db, 'caja'),
-        where('estado', '==', 'abierta'),
-        where('sucursal', '==', selectedNegocio)
+        where('estado', '==', 'abierta')
       ));
       if (!yaAbierta.empty) {
         const existente = { id: yaAbierta.docs[0].id, ...yaAbierta.docs[0].data() };
         setCaja(existente);
-        showToast(`Conectado a caja abierta en ${selectedNegocio}`, 'success');
+        showToast('Conectado a caja abierta', 'success');
         setProcesando(false);
         return;
       }
@@ -230,7 +210,6 @@ export const CajaPage = () => {
       const ahora = new Date();
       const docRef = await addDoc(collection(db, 'caja'), {
         estado: 'abierta',
-        sucursal: selectedNegocio,
         saldoApertura: parseFloat(saldoApertura) || 0,
         saldoAnterior: saldoAnterior || 0,
         montoEfectivo: parseFloat(saldoApertura) || 0,
@@ -241,14 +220,12 @@ export const CajaPage = () => {
         ventasEfectivo: 0,
         ventasTarjeta: 0,
         ventasDebito: 0,
-        ventasMPArista: 0,
-        ventasMPYanet: 0,
+        ventasMercadoPago: 0,
         ventasCuentaDNI: 0,
       });
       setCaja({ 
         id: docRef.id, 
         estado: 'abierta', 
-        sucursal: selectedNegocio,
         saldoApertura: parseFloat(saldoApertura) || 0,
         saldoAnterior: saldoAnterior || 0,
         montoEfectivo: parseFloat(saldoApertura) || 0,
@@ -281,8 +258,7 @@ export const CajaPage = () => {
     const ventasEfectivo = sumarPagos('efectivo');
     const ventasTarjeta = sumarPagos('tarjeta');
     const ventasDebito = sumarPagos('debito');
-    const ventasMPArista = sumarPagos('mercadopagoarista');
-    const ventasMPYanet = sumarPagos('mercadopagoyanet');
+    const ventasMercadoPago = sumarPagos('mercadopago');
     const ventasCuentaDNI = sumarPagos('cuentadni');
     
     const notasCreditoEfectivo = notasCredito.reduce((sum, v) => sum + (v.totalNotaCredito || Math.abs(v.diferencia || v.total)), 0);
@@ -311,8 +287,7 @@ export const CajaPage = () => {
       ventasEfectivo, 
       ventasTarjeta, 
       ventasDebito,
-      ventasMPArista,
-      ventasMPYanet, 
+      ventasMercadoPago,
       ventasCuentaDNI, 
       ventasBrutas,
       notaCreditoTotal,
@@ -333,7 +308,7 @@ export const CajaPage = () => {
     setProcesando(true);
     try {
       const ahora = new Date();
-      const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMPArista, ventasMPYanet, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, totalDescuentos, totalRetiros, totalIngresos, notaCreditoDescuentoTotal } = calcularVentas();
+      const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, totalDescuentos, totalRetiros, totalIngresos, notaCreditoDescuentoTotal } = calcularVentas();
       
       const gastosCajaRoja = retiros.filter(r => r.tipo === 'cajaRoja').reduce((sum, r) => sum + r.monto, 0);
       const gastosOtros = retiros.filter(r => r.tipo !== 'cajaRoja').reduce((sum, r) => sum + r.monto, 0);
@@ -343,8 +318,7 @@ export const CajaPage = () => {
         ventasEfectivo,
         ventasTarjeta,
         ventasDebito,
-        ventasMPArista,
-        ventasMPYanet,
+        ventasMercadoPago,
         ventasCuentaDNI,
         ventasBrutas,
         notaCreditoTotal,
@@ -365,7 +339,7 @@ export const CajaPage = () => {
       });
 
       try {
-        await setDoc(doc(db, 'ultimoCierre', caja.sucursal), {
+        await setDoc(doc(db, 'ultimoCierre', 'unico'), {
           saldoCierre: parseFloat(saldoCierre) || 0,
           fecha: ahora.toISOString(),
           cajaId: caja.id,
@@ -378,7 +352,6 @@ export const CajaPage = () => {
       setSaldoCierre('');
       setVentasHoy([]);
       setMostrarModalCierre(false);
-      clearSelectedNegocio();
       
       if (imprimir) {
         setTimeout(() => imprimirTicketCierre(), 300);
@@ -420,7 +393,6 @@ export const CajaPage = () => {
         monto: monto,
         observacion: observacionRetiro || '',
         cajaId: caja.id,
-        negocio: caja.sucursal,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
         fecha: ahora.toISOString(),
@@ -516,7 +488,6 @@ export const CajaPage = () => {
         monto: monto,
         observacion: observacionIngreso || '',
         cajaId: caja.id,
-        negocio: caja.sucursal,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
         fecha: ahora.toISOString(),
@@ -588,8 +559,7 @@ const imprimirTicketCierre = () => {
     const ahora = new Date();
     const fechaCierre = ahora.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
     const fechaApertura = caja.fecha ? new Date(caja.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
-    const direccion = getDireccion(caja.sucursal);
-    const sucursalNombre = getSucursalNombre(caja.sucursal);
+    const direccion = getDireccion();
 
     const formatMonto = (monto) => monto.toLocaleString('es-AR').padStart(8);
 
@@ -598,15 +568,15 @@ const imprimirTicketCierre = () => {
     const totalIngresos = ingresos.reduce((sum, r) => sum + r.monto, 0);
 
     let ticket = `====================================
-      SANTOS Y SANTAS
+       ME GUSTA
     ${direccion}
     Tel: ${TELEFONO}
 ===================================
      CIERRE DE CAJA
-${fechaCierre}    ${sucursalNombre}
+                ${fechaCierre}
 ───────────────────────────────────
- APERTURA: ${fechaApertura}
- CIERRE:   ${fechaCierre}
+  APERTURA: ${fechaApertura}
+  CIERRE:   ${fechaCierre}
 ───────────────────────────────────
    RESUMEN:
     Ventas Brutas:   $${formatMonto(ventasBrutas)}
@@ -619,8 +589,7 @@ ${fechaCierre}    ${sucursalNombre}
   Efectivo:       $${formatMonto(ventasEfectivo)}
   Tarjeta:        $${formatMonto(ventasTarjeta)}
   Debito:         $${formatMonto(ventasDebito)}
-  MP Arista:      $${formatMonto(ventasMPArista)}
-  MP Yanet:       $${formatMonto(ventasMPYanet)}
+  Mercado Pago:   $${formatMonto(ventasMercadoPago)}
   Cuenta DNI:     $${formatMonto(ventasCuentaDNI)}
 ───────────────────────────────────
   GASTOS:
@@ -735,13 +704,11 @@ ${fechaCierre}    ${sucursalNombre}
         if (!productoDoc.exists()) continue;
 
         const productoData = productoDoc.data();
-        const stockActual = productoData.stockPorNegocio?.[venta.negocio] || 0;
-        const stockGlobalActual = productoData.stockGlobal || 0;
+        const stockActual = productoData.stock || 0;
         const cambioStock = item.esNotaCredito ? -item.cantidad : item.cantidad;
 
         await updateDoc(productoRef, {
-          [`stockPorNegocio.${venta.negocio}`]: stockActual + cambioStock,
-          stockGlobal: stockGlobalActual + cambioStock,
+          stock: stockActual + cambioStock,
         });
       }
 
@@ -758,8 +725,7 @@ ${fechaCierre}    ${sucursalNombre}
               efectivo: 'ventasEfectivo',
               tarjeta: 'ventasTarjeta',
               debito: 'ventasDebito',
-              mercadopagoarista: 'ventasMPArista',
-              mercadopagoyanet: 'ventasMPYanet',
+              mercadopago: 'ventasMercadoPago',
               cuentadni: 'ventasCuentaDNI',
             }[pago.metodo];
             if (campoKey) {
@@ -776,8 +742,7 @@ ${fechaCierre}    ${sucursalNombre}
               efectivo: 'ventasEfectivo',
               tarjeta: 'ventasTarjeta',
               debito: 'ventasDebito',
-              mercadopagoarista: 'ventasMPArista',
-              mercadopagoyanet: 'ventasMPYanet',
+              mercadopago: 'ventasMercadoPago',
               cuentadni: 'ventasCuentaDNI',
             }[metodo];
             if (campoKey) {
@@ -826,41 +791,16 @@ ${fechaCierre}    ${sucursalNombre}
     );
   }
 
-  const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMPArista, ventasMPYanet, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, totalDescuentos, montoVentasNormales, montoNotasCredito, notaCreditoDescuentoTotal } = calcularVentas();
+  const { ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI, ventasBrutas, notaCreditoTotal, ventaNeta, efectivoCaja, saldoSistema, diferencia, totalDescuentos, montoVentasNormales, montoNotasCredito, notaCreditoDescuentoTotal } = calcularVentas();
 
   return (
     <Layout>
       <h2 className="text-2xl font-bold mb-6">Gestión de Caja</h2>
 
-      {selectedNegocio === null ? (
-        <div className="max-w-lg mx-auto">
-          <h3 className="text-xl font-semibold mb-6 text-center">¿En qué negocio estás?</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => setSelectedNegocio('chiclana')}
-              className="bg-card p-8 rounded-xl shadow-sm border border-line hover:shadow-sm hover:bg-indigo-soft transition-all border-2 border-transparent hover:border-indigo-line"
-            >
-              <span className="text-4xl block mb-3">🏪</span>
-              <span className="text-lg font-bold">Chiclana</span>
-              <span className="text-sm text-muted block mt-1">{getDireccion('chiclana')}</span>
-            </button>
-            <button
-              onClick={() => setSelectedNegocio('belgrano')}
-              className="bg-card p-8 rounded-xl shadow-sm border border-line hover:shadow-sm hover:bg-indigo-soft transition-all border-2 border-transparent hover:border-indigo-line"
-            >
-              <span className="text-4xl block mb-3">🏪</span>
-              <span className="text-lg font-bold">Belgrano</span>
-              <span className="text-sm text-muted block mt-1">{getDireccion('belgrano')}</span>
-            </button>
-          </div>
-        </div>
-      ) : !caja ? (
+      {!caja ? (
         <div className="max-w-md mx-auto">
           <div className="bg-card p-6 rounded-lg shadow-sm border border-line">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Apertura de Caja</h3>
-              <span className="bg-indigo-soft text-indigo px-3 py-1 rounded-full text-sm font-medium capitalize">{selectedNegocio}</span>
-            </div>
+            <h3 className="text-xl font-semibold mb-4">Apertura de Caja</h3>
 
             {mostrarPromptAnterior && (
               <div className="mb-4 p-4 bg-indigo-soft border border-indigo-line rounded-lg">
@@ -898,35 +838,20 @@ ${fechaCierre}    ${sucursalNombre}
               {procesando ? 'Procesando...' : 'Abrir Caja'}
             </button>
 
-            <button
-              onClick={clearSelectedNegocio}
-              className="w-full text-sm text-muted hover:text-body py-1"
-            >
-              ← Cambiar de negocio
-            </button>
-          </div>
+            </div>
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="flex justify-end">
-            <button
-              onClick={clearSelectedNegocio}
-              className="text-sm text-indigo hover:text-indigo underline"
-            >
-              ← Cambiar de negocio
-            </button>
-          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-card p-6 rounded-lg shadow-sm border border-line">
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-xl font-semibold">Caja Abierta</h3>
-                  <p className="text-sm text-muted">Negocio: <span className="font-semibold capitalize">{caja.sucursal}</span></p>
                 </div>
                 <span className="bg-green-soft text-green px-3 py-1 rounded-full text-sm">Abierta</span>
               </div>
               
-               <ResumenCaja caja={caja} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} notaCreditoDescuentoTotal={notaCreditoDescuentoTotal} ventaNeta={ventaNeta} efectivoCaja={efectivoCaja} ventasEfectivo={ventasEfectivo} ventasTarjeta={ventasTarjeta} ventasDebito={ventasDebito} ventasMPArista={ventasMPArista} ventasMPYanet={ventasMPYanet} ventasCuentaDNI={ventasCuentaDNI} />
+               <ResumenCaja caja={caja} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} notaCreditoDescuentoTotal={notaCreditoDescuentoTotal} ventaNeta={ventaNeta} efectivoCaja={efectivoCaja} ventasEfectivo={ventasEfectivo} ventasTarjeta={ventasTarjeta} ventasDebito={ventasDebito} ventasMercadoPago={ventasMercadoPago} ventasCuentaDNI={ventasCuentaDNI} />
             </div>
 
             <div className="bg-card p-6 rounded-lg shadow-sm border border-line">
@@ -965,7 +890,7 @@ ${fechaCierre}    ${sucursalNombre}
 
               {saldoCierre && (
                 <div className="mb-4 p-3 bg-yellow-soft rounded text-sm">
-                  <p>Diferencia: <span className={`font-semibold ${diferencia === 0 ? 'text-green' : 'text-red'}`}>${diferencia}</span></p>
+                  <p>Diferencia: <span className={`font-semibold ${diferencia === 0 ? 'text-green' : 'text-red'}`}>${formatNum(diferencia)}</span></p>
                 </div>
               )}
 

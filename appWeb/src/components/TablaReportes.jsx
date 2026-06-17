@@ -1,13 +1,10 @@
-import React from 'react';
+import { formatNum } from '../utils/format';
 
 const TIPOS_RETIRO_FIJOS = [
   { id: 'cajaRoja', nombre: 'Caja roja', icono: '💰' },
   { id: 'gasto', nombre: 'Gasto', icono: '🧹' },
-  { id: 'retiroCaro', nombre: 'Retiro Caro', icono: '👔' },
-  { id: 'retiroFede', nombre: 'Retiro Fede', icono: '👔' },
-  { id: 'errorMP', nombre: 'Error MP', icono: '⚠️' },
-  { id: 'errorDNI', nombre: 'Error DNI', icono: '⚠️' },
-  { id: 'errorTJ', nombre: 'Error TJ', icono: '⚠️' },
+  { id: 'pagoProveedor', nombre: 'Pago Proveedor', icono: '📦' },
+  { id: 'retiro', nombre: 'Retiro', icono: '💸' },
 ];
 
 const TIPOS_INGRESO_FIJOS = [
@@ -145,7 +142,7 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                                  <tr key={idx} className="border-b border-line">
                                   <td className="py-1">{p.nombre}</td>
                                   <td className="py-1">{p.cantidad}</td>
-                                  <td className="py-1">${p.precio}</td>
+                                  <td className="py-1">${formatNum(p.precio)}</td>
                                   <td className="py-1">${(p.precio * p.cantidad).toLocaleString('es-AR')}</td>
                                 </tr>
                               ))}
@@ -193,15 +190,15 @@ export const TablaReportes = ({ movimientosFiltrados, filasExpandidas, toggleFil
                           </div>
                         )}
                         {m.origen === 'retiros' && (
-                          <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${m.monto} | <strong>Obs:</strong> {m.observacion || '-'}</p>
+                          <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${formatNum(m.monto)} | <strong>Obs:</strong> {m.observacion || '-'}</p>
                         )}
                         {m.origen === 'ingresos' && (
-                          <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${m.monto} | <strong>Obs:</strong> {m.observacion || '-'}</p>
+                          <p><strong>Tipo:</strong> {m.tipo} | <strong>Monto:</strong> ${formatNum(m.monto)} | <strong>Obs:</strong> {m.observacion || '-'}</p>
                         )}
                         {m.origen === 'caja' && (
                           <p>
-                            <strong>Saldo Apertura:</strong> ${m.saldoApertura || 0} |
-                            <strong> Saldo Cierre:</strong> ${m.saldoCierre || 0} |
+                            <strong>Saldo Apertura:</strong> ${formatNum(m.saldoApertura || 0)} |
+                            <strong> Saldo Cierre:</strong> ${formatNum(m.saldoCierre || 0)} |
                             <strong> Estado:</strong> {m.estado}
                           </p>
                         )}

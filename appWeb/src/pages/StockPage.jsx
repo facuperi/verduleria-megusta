@@ -5,43 +5,50 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
-import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
+import { useDevice } from '../hooks/useDevice';
 import { Layout } from '../components/Layout';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
+import { formatNum } from '../utils/format';
 
 export const StockPage = () => {
-  const { isGerente, user } = useAuth();
+  const { isGerente } = useAuth();
   const { isMobile } = useDevice();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
-  const [mostrarGlobal, setMostrarGlobal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [procesando, setProcesando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [sortField, setSortField] = useState('nombre');
   const [sortDir, setSortDir] = useState('asc');
-  
+
   const [formData, setFormData] = useState({
+    tipo: 'noPesable',
     codigoBarras: '',
-    codigoInterno: '',
     nombre: '',
-    precioEfectivo: '',
-    precioTarjeta: '',
-    stockChiclana: 0,
-    stockBelgrano: 0,
+    precio: '',
+    stock: 0,
   });
 
   const puedeEditar = isGerente && !isMobile;
 
-  const calcularStockGlobal = (stockChiclana, stockBelgrano) => {
-    return (parseInt(stockChiclana) || 0) + (parseInt(stockBelgrano) || 0);
-  };
+  const resetForm = () => setFormData({
+    tipo: 'noPesable',
+    codigoBarras: '',
+    nombre: '',
+    precio: '',
+    stock: 0,
+  });
+
+  const esPesableSuelto = (tipo) => tipo === 'pesable';
+  const esPesableConStock = (tipo) => tipo === 'pesableConStock';
+  const esPesable = (tipo) => esPesableSuelto(tipo) || esPesableConStock(tipo);
+  const esNoPesable = (tipo) => tipo === 'noPesable';
 
   const toggleSort = (field) => {
     if (sortField === field) {
@@ -70,33 +77,34 @@ export const StockPage = () => {
     e.preventDefault();
     setProcesando(true);
     try {
-      const stockGlobal = calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano);
-      
       const data = {
-        codigoBarras: formData.codigoBarras.trim(),
-        codigoInterno: formData.codigoInterno.trim(),
+        tipo: formData.tipo,
         nombre: formData.nombre.trim(),
-        precioEfectivo: parseFloat(formData.precioEfectivo) || 0,
-        precioTarjeta: parseFloat(formData.precioTarjeta) || 0,
-        stockPorNegocio: {
-          chiclana: parseInt(formData.stockChiclana) || 0,
-          belgrano: parseInt(formData.stockBelgrano) || 0,
-        },
-        stockGlobal,
+        precio: parseFloat(formData.precio) || 0,
         fechaActualizado: new Date().toISOString(),
       };
 
+      if (esPesableSuelto(formData.tipo)) {
+        data.codigoBarras = '';
+        data.stock = 0;
+      } else if (esPesableConStock(formData.tipo)) {
+        data.codigoBarras = '';
+        data.stock = parseFloat(formData.stock) || 0;
+      } else {
+        data.codigoBarras = formData.codigoBarras.trim();
+        data.stock = parseInt(formData.stock) || 0;
+      }
+
       if (editando) {
-        const { stockPorNegocio, stockGlobal, ...editData } = data;
-        await updateDoc(doc(db, 'productos', editando.id), editData);
+        await updateDoc(doc(db, 'productos', editando.id), data);
       } else {
         await addDoc(collection(db, 'productos'), data);
       }
 
       setShowModal(false);
       setEditando(null);
-      setFormData({ codigoBarras: '', codigoInterno: '', nombre: '', precioEfectivo: '', precioTarjeta: '', stockChiclana: 0, stockBelgrano: 0 });
-      
+      resetForm();
+
       const snapshot = await getDocs(collection(db, 'productos'));
       setProductos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
@@ -126,34 +134,33 @@ export const StockPage = () => {
   const abrirEditar = (producto) => {
     setEditando(producto);
     setFormData({
+      tipo: producto.tipo || 'noPesable',
       codigoBarras: producto.codigoBarras || '',
-      codigoInterno: producto.codigoInterno || '',
       nombre: producto.nombre || '',
-      precioEfectivo: producto.precioEfectivo?.toString() || '',
-      precioTarjeta: producto.precioTarjeta?.toString() || '',
-      stockChiclana: producto.stockPorNegocio?.chiclana || 0,
-      stockBelgrano: producto.stockPorNegocio?.belgrano || 0,
+      precio: producto.precio?.toString() || '',
+      stock: producto.stock || 0,
     });
     setShowModal(true);
   };
 
   const exportarExcel = () => {
+    const tipoLabel = (p) => {
+      if (p.tipo === 'pesable') return 'Pesable suelto';
+      if (p.tipo === 'pesableConStock') return 'Pesable c/Stock';
+      return 'No Pesable';
+    };
     const datos = productos.map(p => ({
-      'Código Barras': p.codigoBarras || '',
-      'Código Interno': p.codigoInterno || '',
+      Tipo: tipoLabel(p),
+      'Código Barras': p.tipo === 'noPesable' ? (p.codigoBarras || '') : '-',
       Nombre: p.nombre || '',
-      'Precio Efectivo': p.precioEfectivo || 0,
-      'Precio Tarjeta': p.precioTarjeta || 0,
-      'Stock Chiclana': p.stockPorNegocio?.chiclana || 0,
-      'Stock Belgrano': p.stockPorNegocio?.belgrano || 0,
-      'Stock Global': p.stockGlobal || 0,
+      Precio: p.precio || 0,
+      Stock: p.tipo === 'pesable' ? '-' : String(p.stock || 0) + (p.tipo === 'pesableConStock' ? ' kg' : ''),
     }));
 
     const ws = XLSX.utils.json_to_sheet(datos);
     const colWidths = [
-      { wch: 18 }, { wch: 15 }, { wch: 30 },
-      { wch: 16 }, { wch: 14 },
-      { wch: 14 }, { wch: 14 }, { wch: 12 },
+      { wch: 14 }, { wch: 18 }, { wch: 30 },
+      { wch: 12 }, { wch: 10 },
     ];
     ws['!cols'] = colWidths;
     const wb = XLSX.utils.book_new();
@@ -161,10 +168,9 @@ export const StockPage = () => {
     XLSX.writeFile(wb, `productos_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const productosFiltrados = productos.filter(p => 
+  const productosFiltrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.codigoBarras?.includes(busqueda) ||
-    p.codigoInterno?.toLowerCase().includes(busqueda.toLowerCase())
+    p.codigoBarras?.includes(busqueda)
   );
 
   const productosOrdenados = [...productosFiltrados].sort((a, b) => {
@@ -184,14 +190,6 @@ export const StockPage = () => {
         <div className="flex gap-2">
           {isGerente && (
             <button
-              onClick={() => setMostrarGlobal(!mostrarGlobal)}
-              className={`px-4 py-2 rounded ${mostrarGlobal ? 'bg-purple-600 text-white' : 'bg-elevated'}`}
-            >
-              {mostrarGlobal ? 'Ver por Negocio' : 'Ver Global'}
-            </button>
-          )}
-          {isGerente && (
-            <button
               onClick={exportarExcel}
               className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             >
@@ -200,7 +198,7 @@ export const StockPage = () => {
           )}
           {puedeEditar && (
             <button
-              onClick={() => { setShowModal(true); setEditando(null); setFormData({ codigoBarras: '', codigoInterno: '', nombre: '', precioEfectivo: '', precioTarjeta: '', stockChiclana: 0, stockBelgrano: 0 }); }}
+              onClick={() => { setShowModal(true); setEditando(null); resetForm(); }}
               className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
             >
               + Agregar Producto
@@ -212,7 +210,7 @@ export const StockPage = () => {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Buscar por nombre, código de barras o código interno..."
+          placeholder="Buscar por nombre o código de barras..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="w-full border border-line-input bg-input text-body p-2 rounded"
@@ -223,21 +221,12 @@ export const StockPage = () => {
           <table className="w-full">
           <thead className="bg-table-header">
             <tr>
-              <th className="px-4 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort('codigoInterno')}>
-                Código {sortField === 'codigoInterno' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
-              </th>
+              <th className="px-4 py-2 text-left">Tipo</th>
               <th className="px-4 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort('nombre')}>
                 Nombre {sortField === 'nombre' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
               </th>
-              <th className="px-4 py-2 text-right">Precios (EF/TJ)</th>
-              {mostrarGlobal ? (
-                <th className="px-4 py-2 text-center">Stock Global</th>
-              ) : (
-                <>
-                  <th className="px-4 py-2 text-center">Chiclana</th>
-                  <th className="px-4 py-2 text-center">Belgrano</th>
-                </>
-              )}
+              <th className="px-4 py-2 text-right">Precio</th>
+              <th className="px-4 py-2 text-center">Stock</th>
               {puedeEditar && (
                 <th className="px-4 py-2 text-right">Acciones</th>
               )}
@@ -246,32 +235,35 @@ export const StockPage = () => {
           <tbody>
             {productosOrdenados.map(producto => (
               <tr key={producto.id} className="border-t border-line">
-                <td className="px-4 py-2 text-sm">{producto.codigoInterno}</td>
-                <td className="px-4 py-2">{producto.nombre}</td>
-                <td className="px-4 py-2 text-right">
-                  <span className="block">EF: ${producto.precioEfectivo}</span>
-                  <span className="text-muted text-sm">TJ: ${producto.precioTarjeta}</span>
+                <td className="px-4 py-2 text-sm">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    esPesable(producto.tipo) ? 'bg-amber-soft text-amber' : 'bg-blue-soft text-blue'
+                  }`}>
+                    {esPesableSuelto(producto.tipo) && '⚖️ Pesable'}
+                    {esPesableConStock(producto.tipo) && '⚖️ Pesable c/Stock'}
+                    {esNoPesable(producto.tipo) && '📦 No Pesable'}
+                  </span>
                 </td>
-                {mostrarGlobal ? (
-                  <td className="px-4 py-2 text-center">
-                    <span className={`font-semibold ${producto.stockGlobal > 0 ? 'text-green' : 'text-red'}`}>
-                      {producto.stockGlobal || 0}
+                <td className="px-4 py-2">{producto.nombre}</td>
+                <td className="px-4 py-2 text-right font-semibold">
+                  ${formatNum(producto.precio)}
+                  {esPesable(producto.tipo) && <span className="text-xs text-muted"> /kg</span>}
+                </td>
+                <td className="px-4 py-2 text-center">
+                  {esPesableSuelto(producto.tipo) ? (
+                    <span className="text-muted">—</span>
+                  ) : esPesableConStock(producto.tipo) ? (
+                    <span className={`font-semibold ${producto.stock > 0 ? 'text-green' : 'text-red'}`}>
+                      {formatNum(producto.stock || 0)} kg
+                      {producto.stock < 0 && <span className="ml-1 text-xs bg-red-soft text-red px-1 py-0.5 rounded">⚠️ Negativo</span>}
                     </span>
-                  </td>
-                ) : (
-                  <>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`font-semibold ${producto.stockPorNegocio?.chiclana > 0 ? 'text-green' : 'text-red'}`}>
-                        {producto.stockPorNegocio?.chiclana || 0}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`font-semibold ${producto.stockPorNegocio?.belgrano > 0 ? 'text-green' : 'text-red'}`}>
-                        {producto.stockPorNegocio?.belgrano || 0}
-                      </span>
-                    </td>
-                  </>
-                )}
+                  ) : (
+                    <span className={`font-semibold ${producto.stock > 0 ? 'text-green' : 'text-red'}`}>
+                      {formatNum(producto.stock || 0)}
+                      {producto.stock < 0 && <span className="ml-1 text-xs bg-red-soft text-red px-1 py-0.5 rounded">⚠️ Negativo</span>}
+                    </span>
+                  )}
+                </td>
                 {puedeEditar && (
                   <td className="px-4 py-2 text-right">
                     <button onClick={() => abrirEditar(producto)} className="text-blue hover:text-blue mr-2">
@@ -294,25 +286,31 @@ export const StockPage = () => {
       <Modal open={showModal && puedeEditar} onClose={() => setShowModal(false)} title={editando ? 'Editar Producto' : 'Agregar Producto'}>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="block text-sm font-bold mb-1">Código de Barras</label>
-            <input
-              type="text"
-              value={formData.codigoBarras}
-              onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
+            <label className="block text-sm font-bold mb-1">Tipo de producto</label>
+            <select
+              value={formData.tipo}
+              onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
               className="w-full border border-line-input bg-input text-body p-2 rounded"
-              placeholder="Escanear o ingresar"
-            />
+            >
+              <option value="noPesable">No Pesable (con código de barras)</option>
+              <option value="pesable">Pesable suelto (por kg, sin stock)</option>
+              <option value="pesableConStock">Pesable con Stock (control en kg)</option>
+            </select>
           </div>
-          <div className="mb-3">
-            <label className="block text-sm font-bold mb-1">Código Interno</label>
-            <input
-              type="text"
-              value={formData.codigoInterno}
-              onChange={(e) => setFormData({ ...formData, codigoInterno: e.target.value })}
-              className="w-full border border-line-input bg-input text-body p-2 rounded"
-              required
-            />
-          </div>
+
+          {esNoPesable(formData.tipo) && (
+            <div className="mb-3">
+              <label className="block text-sm font-bold mb-1">Código de Barras</label>
+              <input
+                type="text"
+                value={formData.codigoBarras}
+                onChange={(e) => setFormData({ ...formData, codigoBarras: e.target.value })}
+                className="w-full border border-line-input bg-input text-body p-2 rounded"
+                placeholder="Escanear o ingresar"
+              />
+            </div>
+          )}
+
           <div className="mb-3">
             <label className="block text-sm font-bold mb-1">Nombre</label>
             <input
@@ -323,61 +321,36 @@ export const StockPage = () => {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div>
-              <label className="block text-sm font-bold mb-1">Precio Efectivo</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.precioEfectivo}
-                onChange={(e) => setFormData({ ...formData, precioEfectivo: e.target.value })}
-                className="w-full border border-line-input bg-input text-body p-2 rounded"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold mb-1">Precio Tarjeta</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.precioTarjeta}
-                onChange={(e) => setFormData({ ...formData, precioTarjeta: e.target.value })}
-                className="w-full border border-line-input bg-input text-body p-2 rounded"
-                required
-              />
-            </div>
+
+          <div className="mb-3">
+            <label className="block text-sm font-bold mb-1">
+              Precio {esPesable(formData.tipo) ? 'por kg' : ''}
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.precio}
+              onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
+              className="w-full border border-line-input bg-input text-body p-2 rounded"
+              required
+            />
           </div>
-          {!editando ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <label className="block text-sm font-bold mb-1">Stock Chiclana</label>
-                  <input
-                    type="number"
-                    value={formData.stockChiclana}
-                    onChange={(e) => setFormData({ ...formData, stockChiclana: e.target.value })}
-                    className="w-full border border-line-input bg-input text-body p-2 rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1">Stock Belgrano</label>
-                  <input
-                    type="number"
-                    value={formData.stockBelgrano}
-                    onChange={(e) => setFormData({ ...formData, stockBelgrano: e.target.value })}
-                    className="w-full border border-line-input bg-input text-body p-2 rounded"
-                  />
-                </div>
-              </div>
-              <div className="bg-elevated p-2 rounded mb-3 text-sm text-center">
-                Stock Global: {calcularStockGlobal(formData.stockChiclana, formData.stockBelgrano)}
-              </div>
-            </>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded mb-3 text-sm text-amber-800">
-              El stock se gestiona desde <strong>Movimientos de Stock</strong>
+
+          {!esPesableSuelto(formData.tipo) && (
+            <div className="mb-3">
+              <label className="block text-sm font-bold mb-1">
+                Stock inicial {esPesableConStock(formData.tipo) ? '(kg)' : ''}
+              </label>
+              <input
+                type="number"
+                step={esPesableConStock(formData.tipo) ? '0.1' : '1'}
+                value={formData.stock}
+                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                className="w-full border border-line-input bg-input text-body p-2 rounded"
+              />
             </div>
           )}
+
           <div className="flex gap-2">
             <button type="submit" disabled={procesando} className="bg-indigo-600 text-white px-4 py-2 rounded flex-1 disabled:opacity-50">
               {procesando ? 'Guardando...' : 'Guardar'}

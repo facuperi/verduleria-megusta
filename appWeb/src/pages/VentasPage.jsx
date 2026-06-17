@@ -20,8 +20,7 @@ const METODOS_PAGO = [
   { id: 'efectivo', nombre: 'Efectivo' },
   { id: 'tarjeta', nombre: 'Tarjeta' },
   { id: 'debito', nombre: 'Débito' },
-  { id: 'mercadopagoarista', nombre: 'MP Arista' },
-  { id: 'mercadopagoyanet', nombre: 'MP Yanet' },
+  { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
@@ -34,13 +33,14 @@ const calcularIva = (total) => {
 const calcularDescuento = (pago, totalBase = 0) => {
   if (!pago.descuentoTipo || !pago.descuentoValor) return 0;
   const valor = parseFloat(pago.descuentoValor) || 0;
-  if (pago.descuentoTipo === 'porcentaje') return totalBase * valor / 100;
+  const base = Math.max(0, totalBase);
+  if (pago.descuentoTipo === 'porcentaje') return base * valor / 100;
   if (pago.descuentoTipo === 'fijo') return valor;
   return 0;
 };
 
 const necesitaFacturaAuto = (tiposPago) => {
-  const metodosAuto = ['tarjeta', 'debito', 'cuentadni', 'mercadopagoarista'];
+  const metodosAuto = ['tarjeta', 'debito', 'cuentadni', 'mercadopago'];
   return metodosAuto.some(m => tiposPago.includes(m));
 };
 
@@ -68,7 +68,7 @@ const facturarVenta = async (ventaId, total, tipoFactura, documentoCliente) => {
 };
 
 export const VentasPage = () => {
-  const { user, selectedNegocio } = useAuth();
+  const { user } = useAuth();
   const { isMobile } = useDevice();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -108,18 +108,20 @@ export const VentasPage = () => {
   
   const inputScannerRef = useRef(null);
 
+  const esPesable = (tipo) => tipo === 'pesable' || tipo === 'pesableConStock';
+
   const totalVenta = carrito
     .filter(p => !p.esNotaCredito)
     .reduce((sum, p) => {
-      const precio = p.precioSeleccionado === 'tarjeta' ? p.precioTarjeta : p.precioEfectivo;
-      return sum + (precio * p.cantidad);
+      const monto = esPesable(p.tipo) ? p.precio * (p.peso || 0) : p.precio * (p.cantidad || 1);
+      return sum + monto;
     }, 0);
 
   const totalNotaCredito = carrito
     .filter(p => p.esNotaCredito)
     .reduce((sum, p) => {
-      const precio = p.precioSeleccionado === 'tarjeta' ? p.precioTarjeta : p.precioEfectivo;
-      return sum + (precio * p.cantidad);
+      const monto = esPesable(p.tipo) ? p.precio * (p.peso || 0) : p.precio * (p.cantidad || 1);
+      return sum + monto;
     }, 0);
 
   const diferencia = totalVenta - totalNotaCredito;
@@ -135,32 +137,26 @@ export const VentasPage = () => {
   useEffect(() => {
     if (carrito.length === 0) return;
     setPagosSeleccionados(prev => {
-      if (prev.length === 0) {
-        return [{ metodo: 'efectivo', monto: Math.max(0, totalConDescuento), descuentoTipo: null, descuentoValor: 0 }];
-      }
       const target = Math.max(0, totalConDescuento);
       const sumActual = prev.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
       if (Math.abs(sumActual - target) < 0.01) return prev;
-      const diff = Math.round((target - sumActual) * 100) / 100;
-      const updated = [...prev];
-      const nuevo = Math.max(0, Math.round(((parseFloat(prev[0].monto) || 0) + diff) * 100) / 100);
-      updated[0] = { ...updated[0], monto: nuevo };
-      return updated;
+
+      if (target === 0) {
+        return prev.map(p => ({ ...p, monto: 0 }));
+      }
+
+      if (sumActual === 0) {
+        return [{ metodo: 'efectivo', monto: target, descuentoTipo: null, descuentoValor: 0 }];
+      }
+
+      return prev.map(p => ({
+        ...p,
+        monto: Math.round((parseFloat(p.monto) || 0) / sumActual * target * 100) / 100,
+      }));
     });
   }, [carrito.length, totalConDescuento, notaCreditoOriginal]);
 
   const tienePagoTarjeta = pagosSeleccionados.some(p => p.metodo === 'tarjeta');
-
-  useEffect(() => {
-    setCarrito(prev => {
-      if (prev.length === 0) return prev;
-      const todosBien = prev.every(p =>
-        tienePagoTarjeta ? p.precioSeleccionado === 'tarjeta' : p.precioSeleccionado === 'efectivo'
-      );
-      if (todosBien) return prev;
-      return prev.map(p => ({ ...p, precioSeleccionado: tienePagoTarjeta ? 'tarjeta' : 'efectivo' }));
-    });
-  }, [tienePagoTarjeta]);
   
   const restriction = checkDeviceRestriction('venta');
   const canSell = !isMobile || restriction.allowed.includes('mobile');
@@ -172,13 +168,13 @@ export const VentasPage = () => {
         const productosSnapshot = await getDocs(collection(db, 'productos'));
         setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         
-        // Verificar caja abierta del negocio
-        if (!user || !selectedNegocio) {
+        // Verificar caja abierta
+        if (!user) {
           setCaja(null);
           setLoading(false);
           return;
         }
-        const cajaQuery = query(collection(db, 'caja'), where('estado', '==', 'abierta'), where('sucursal', '==', selectedNegocio));
+        const cajaQuery = query(collection(db, 'caja'), where('estado', '==', 'abierta'));
         const cajaSnapshot = await getDocs(cajaQuery);
         
         if (!cajaSnapshot.empty) {
@@ -221,61 +217,65 @@ export const VentasPage = () => {
     const textoLower = texto.toLowerCase().trim();
     return productos.filter(p => 
       p.codigoBarras?.includes(textoLower) ||
-      p.codigoInterno?.toLowerCase().includes(textoLower) ||
       p.nombre?.toLowerCase().includes(textoLower)
     );
   };
 
-  const agregarAlCarrito = (producto, tipoPrecio = 'efectivo') => {
-    if (!agregarComoNotaCredito && caja && (producto.stockPorNegocio?.[caja.sucursal] || 0) <= 0) {
-      showToast(`❌ ${producto.nombre} no tiene existencias en ${caja.sucursal === 'chiclana' ? 'Chiclana' : 'Belgrano'}`, 'warning');
+  const agregarAlCarrito = (producto) => {
+    if (esPesable(producto.tipo)) {
+      if (!agregarComoNotaCredito && producto.tipo === 'pesableConStock' && (producto.stock || 0) <= 0) {
+        showToast(`⚠️ ${producto.nombre} no tiene existencias` + (producto.stock < 0 ? ` (stock: ${producto.stock})` : ''), 'warning');
+      }
+      setCarrito([...carrito, { ...producto, cantidad: 1, peso: 1, esNotaCredito: false }]);
+      setBusqueda('');
+      setVentaExitosa(null);
       return;
     }
-    const existe = carrito.find(p => p.id === producto.id && p.precioSeleccionado === tipoPrecio);
+    if (!agregarComoNotaCredito && caja && (producto.stock || 0) <= 0) {
+      showToast(`⚠️ ${producto.nombre} no tiene existencias` + (producto.stock < 0 ? ` (stock: ${producto.stock})` : ''), 'warning');
+    }
+    const existe = carrito.find(p => p.id === producto.id);
     if (existe) {
       setCarrito(carrito.map(p => 
-        p.id === producto.id && p.precioSeleccionado === tipoPrecio ? { ...p, cantidad: p.cantidad + 1 } : p
+        p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
       ));
     } else {
-      setCarrito([...carrito, { ...producto, cantidad: 1, precioSeleccionado: tipoPrecio, esNotaCredito: agregarComoNotaCredito }]);
+      setCarrito([...carrito, { ...producto, cantidad: 1, esNotaCredito: agregarComoNotaCredito }]);
     }
     setBusqueda('');
     setVentaExitosa(null);
   };
 
-  const quitarDelCarrito = (productoId, precioSeleccionado) => {
-    setCarrito(carrito.filter(p => !(p.id === productoId && p.precioSeleccionado === precioSeleccionado)));
+  const quitarDelCarrito = (productoId) => {
+    setCarrito(carrito.filter(p => p.id !== productoId));
     setVentaExitosa(null);
   };
 
-  const actualizarCantidad = (productoId, precioSeleccionado, nuevaCantidad) => {
+  const actualizarCantidad = (productoId, nuevaCantidad) => {
     if (nuevaCantidad < 1) {
-      quitarDelCarrito(productoId, precioSeleccionado);
+      quitarDelCarrito(productoId);
       return;
     }
     setCarrito(carrito.map(p => 
-      p.id === productoId && p.precioSeleccionado === precioSeleccionado ? { ...p, cantidad: nuevaCantidad } : p
+      p.id === productoId ? { ...p, cantidad: nuevaCantidad } : p
     ));
   };
 
-  const toggleNotaCredito = (productoId, precioSeleccionado) => {
+  const toggleNotaCredito = (productoId) => {
     setCarrito(carrito.map(p => 
-      p.id === productoId && p.precioSeleccionado === precioSeleccionado ? { ...p, esNotaCredito: !p.esNotaCredito } : p
+      p.id === productoId ? { ...p, esNotaCredito: !p.esNotaCredito } : p
     ));
   };
 
-  const autoAjustarMontos = (pagos) => {
-    const sumMontos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
+  const autoAjustarMontos = (pagos, changedIndex) => {
     const descs = pagos.reduce((sum, p) => sum + calcularDescuento(p, diferencia), 0);
     const nuevoTotalConDesc = Math.max(0, diferencia - descs);
-    const restante = Math.round((nuevoTotalConDesc - sumMontos) * 100) / 100;
-
-    if (Math.abs(restante) < 0.01) return false;
-
-    const actual = parseFloat(pagos[0]?.monto) || 0;
-    const nuevo = Math.max(0, actual + restante);
-    if (nuevo !== actual) {
-      pagos[0] = { ...pagos[0], monto: Math.round(nuevo * 100) / 100 };
+    const idx = changedIndex !== undefined ? changedIndex : 0;
+    const sumaOtros = pagos.reduce((sum, p, i) => i !== idx ? sum + (parseFloat(p.monto) || 0) : sum, 0);
+    const nuevoMonto = Math.round(Math.max(0, nuevoTotalConDesc - sumaOtros) * 100) / 100;
+    const actual = Math.round((parseFloat(pagos[idx]?.monto) || 0) * 100) / 100;
+    if (Math.abs(nuevoMonto - actual) >= 0.01) {
+      pagos[idx] = { ...pagos[idx], monto: nuevoMonto };
       return true;
     }
     return false;
@@ -289,7 +289,7 @@ export const VentasPage = () => {
     }
     nuevosPagos[index] = { ...nuevosPagos[index], [campo]: valor };
     if (campo === 'descuentoValor') {
-      autoAjustarMontos(nuevosPagos);
+      autoAjustarMontos(nuevosPagos, index);
     }
     setPagosSeleccionados(nuevosPagos);
   };
@@ -302,13 +302,25 @@ export const VentasPage = () => {
       descuentoTipo: actual === tipo ? null : tipo,
       descuentoValor: actual === tipo ? 0 : nuevosPagos[index].descuentoValor,
     };
-    autoAjustarMontos(nuevosPagos);
+    autoAjustarMontos(nuevosPagos, index);
+    setPagosSeleccionados(nuevosPagos);
+  };
+
+  const handleDescuento10 = (index) => {
+    const nuevosPagos = [...pagosSeleccionados];
+    const yaActivo = nuevosPagos[index].descuentoTipo === 'porcentaje' && nuevosPagos[index].descuentoValor == 10;
+    nuevosPagos[index] = {
+      ...nuevosPagos[index],
+      descuentoTipo: yaActivo ? null : 'porcentaje',
+      descuentoValor: yaActivo ? 0 : 10,
+    };
+    autoAjustarMontos(nuevosPagos, index);
     setPagosSeleccionados(nuevosPagos);
   };
 
   const handleMontoBlur = (index) => {
     const nuevosPagos = [...pagosSeleccionados];
-    autoAjustarMontos(nuevosPagos);
+    autoAjustarMontos(nuevosPagos, index);
     setPagosSeleccionados(nuevosPagos);
   };
 
@@ -317,7 +329,7 @@ export const VentasPage = () => {
     const primerDisponible = METODOS_PAGO.find(m => !metodosExistentes.includes(m.id));
     if (!primerDisponible) return;
     const nuevosPagos = [...pagosSeleccionados, { metodo: primerDisponible.id, monto: 0, descuentoTipo: null, descuentoValor: 0 }];
-    autoAjustarMontos(nuevosPagos);
+    autoAjustarMontos(nuevosPagos, nuevosPagos.length - 1);
     setPagosSeleccionados(nuevosPagos);
   };
 
@@ -330,15 +342,6 @@ export const VentasPage = () => {
   };
 
   const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
-
-  const handleTogglePrecioGlobal = () => {
-    setCarrito(prev => prev.map(p => ({
-      ...p,
-      precioSeleccionado: p.precioSeleccionado === 'tarjeta' ? 'efectivo' : 'tarjeta'
-    })));
-  };
-
-  const tipoPrecioGlobal = carrito.some(p => p.precioSeleccionado === 'tarjeta') ? 'tarjeta' : 'efectivo';
 
   const handleFacturarManual = async () => {
     if (!ventaExitosa) return;
@@ -416,12 +419,8 @@ export const VentasPage = () => {
     }
     if (carrito.length === 0) return;
     
-    if (totalConDescuento > 0 && totalPagos !== totalConDescuento) {
-      setError(`El total de los pagos debe ser igual a $${totalConDescuento}`);
-      return;
-    }
-    if (totalConDescuento <= 0 && totalPagos !== 0) {
-      setError('No hay monto a pagar. Los pagos deben ser $0');
+    if (Math.abs(totalPagos - totalConDescuento) > 0.01) {
+      setError(`Los pagos suman $${totalPagos} pero deberían sumar $${totalConDescuento}`);
       return;
     }
 
@@ -437,21 +436,16 @@ export const VentasPage = () => {
       if (tieneNotaCredito && tieneVentaNormal) tipoVenta = 'mixta';
       else if (tieneNotaCredito) tipoVenta = 'notaCredito';
 
-      const productosVenta = carrito.map(item => {
-        const precio = item.precioSeleccionado === 'tarjeta' ? item.precioTarjeta : item.precioEfectivo;
-        return {
-          productoId: item.id,
-          nombre: item.nombre,
-          codigoInterno: item.codigoInterno,
-          cantidad: item.cantidad,
-          precio,
-          tipoPrecio: item.precioSeleccionado,
-          esNotaCredito: item.esNotaCredito || false,
-        };
-      });
+      const productosVenta = carrito.map(item => ({
+        productoId: item.id,
+        nombre: item.nombre,
+        cantidad: item.cantidad || 1,
+        precio: item.precio,
+        ...(item.peso !== undefined && { peso: item.peso }),
+        esNotaCredito: item.esNotaCredito || false,
+      }));
 
       const ventaDoc = await addDoc(collection(db, 'ventas'), {
-        negocio: caja.sucursal,
         productos: productosVenta,
         total: totalConDescuento,
         totalVenta,
@@ -470,9 +464,9 @@ export const VentasPage = () => {
             montoReal: Math.max(0, (parseFloat(p.monto) || 0) - desc),
           };
         }),
-        notaCreditoDescuento: notaCreditoDescuento > 0 ? notaCreditoDescuento : undefined,
-        notaCreditoOriginal: montoNCReal > 0 ? montoNCReal : undefined,
-        nuevoSaldoFavor: sobranteNC > 0 ? sobranteNC : undefined,
+        ...(notaCreditoDescuento > 0 && { notaCreditoDescuento }),
+        ...(montoNCReal > 0 && { notaCreditoOriginal: montoNCReal }),
+        ...(sobranteNC > 0 && { nuevoSaldoFavor: sobranteNC }),
         facturada: false,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
@@ -481,22 +475,20 @@ export const VentasPage = () => {
         tipoDescuento: totalDescuentos > 0 && tipoDescuento ? tipoDescuento : null,
       });
 
-      // Actualizar stock del negocio
+      // Actualizar stock
       for (const item of carrito) {
+        if (item.tipo === 'pesable') continue;
         const productoRef = doc(db, 'productos', item.id);
         const productoDoc = await getDoc(productoRef);
         const productoData = productoDoc.data();
         
-        const stockActual = productoData.stockPorNegocio?.[caja.sucursal] || 0;
-        const stockGlobalActual = productoData.stockGlobal || 0;
-        
-        const cambioStock = item.esNotaCredito ? item.cantidad : -item.cantidad;
-        const nuevoStock = stockActual + cambioStock;
-        const nuevoStockGlobal = stockGlobalActual + cambioStock;
+        const stockActual = productoData.stock || 0;
+        const esKg = item.tipo === 'pesableConStock';
+        const cambio = item.esNotaCredito ? (esKg ? item.peso : item.cantidad) : -(esKg ? item.peso : item.cantidad);
+        const nuevoStock = Math.max(-999999, stockActual + cambio);
         
         await updateDoc(productoRef, {
-          [`stockPorNegocio.${caja.sucursal}`]: nuevoStock,
-          stockGlobal: nuevoStockGlobal,
+          stock: isNaN(nuevoStock) ? 0 : parseFloat(nuevoStock.toFixed(2)),
         });
       }
 
@@ -511,8 +503,7 @@ export const VentasPage = () => {
             'efectivo': 'ventasEfectivo',
             'tarjeta': 'ventasTarjeta',
             'debito': 'ventasDebito',
-            'mercadopagoarista': 'ventasMPArista',
-            'mercadopagoyanet': 'ventasMPYanet',
+            'mercadopago': 'ventasMercadoPago',
             'cuentadni': 'ventasCuentaDNI',
           }[pago.metodo];
           
@@ -566,7 +557,6 @@ export const VentasPage = () => {
         tipoPago: pagosSeleccionados.map(p => p.metodo),
         pagos: pagosConDescuento,
         tipoVenta,
-        negocio: caja.sucursal,
         notaCreditoDescuento: notaCreditoDescuento > 0 ? notaCreditoDescuento : undefined,
         nuevoSaldoFavor: sobranteNC > 0 ? sobranteNC : undefined,
       };
@@ -609,11 +599,13 @@ export const VentasPage = () => {
       
       showToast('Venta realizada con éxito', 'success');
     } catch (err) {
-      console.error(err);
+      console.error('Error al realizar venta:', err, 'message:', err.message);
       if (err.code === 'permission-denied') {
-        setError('La caja fue cerrada en otro dispositivo. Recargá la página.');
+        setError('⚠️ La caja fue cerrada en otro dispositivo. Recargá la página.');
+      } else if (err.message?.includes('undefined') || err.message?.includes('NaN')) {
+        setError('⚠️ Error interno: dato inválido en la venta. Reintentá o contactá al administrador.');
       } else {
-        setError('Error al realizar venta');
+        setError('⚠️ Error al realizar la venta. Revisá la conexión e intentá de nuevo.');
       }
     } finally {
       setVendiendo(false);
@@ -690,7 +682,6 @@ export const VentasPage = () => {
             busqueda={busqueda}
             productosFiltrados={productosFiltrados}
             productos={productos}
-            sucursal={caja?.sucursal}
             agregarComoNotaCredito={agregarComoNotaCredito}
             inputRef={inputScannerRef}
             onBusquedaChange={setBusqueda}
@@ -715,23 +706,25 @@ export const VentasPage = () => {
             totalDescuentos={totalDescuentos}
             totalConDescuento={totalConDescuento}
             error={error}
-            tipoPrecioGlobal={tipoPrecioGlobal}
             tiposDescuento={tiposDescuento}
             tipoDescuento={tipoDescuento}
+            pesoActual={null}
+            conectandoBalanza={false}
             onChangeTipoDescuento={setTipoDescuento}
             onAbrirModalTipoDesc={() => setMostrarModalNuevoTipoDesc(true)}
             onCambiarCantidad={actualizarCantidad}
             onQuitarDelCarrito={quitarDelCarrito}
-            onTogglePrecioGlobal={handleTogglePrecioGlobal}
             onToggleNotaCredito={toggleNotaCredito}
             onPagoChange={handlePagoChange}
             onDescuentoTipo={handleDescuentoTipo}
+            onDescuento10={handleDescuento10}
             onMontoBlur={handleMontoBlur}
             onAgregarMetodoPago={agregarMetodoPago}
             onQuitarMetodoPago={quitarMetodoPago}
             onObservacionChange={setObservacion}
             onImprimirAFavor={() => imprimirTicketAFavor(diferencia, caja, user?.email)}
             onRealizarVenta={realizarVenta}
+            onConectarBalanza={() => {}}
             notaCreditoOriginal={notaCreditoOriginal}
             mostrarInputNC={mostrarInputNC}
             notaCreditoDescuento={notaCreditoDescuento}

@@ -1,42 +1,43 @@
-export const ResumenCaja = ({ caja, ventasBrutas, notaCreditoTotal, notaCreditoDescuentoTotal, ventaNeta, efectivoCaja, ventasEfectivo, ventasTarjeta, ventasDebito, ventasMPArista, ventasMPYanet, ventasCuentaDNI }) => {
+import { formatNum } from '../utils/format';
+
+export const ResumenCaja = ({ caja, ventasBrutas, notaCreditoTotal, notaCreditoDescuentoTotal, ventaNeta, efectivoCaja, ventasEfectivo, ventasTarjeta, ventasDebito, ventasMercadoPago, ventasCuentaDNI }) => {
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mt-4">
-        <div className="bg-card p-3 rounded">
-          <p className="text-sm text-muted">Saldo Apertura</p>
-          <p className="font-semibold">${caja.saldoApertura}</p>
+        <div className="bg-card p-3 rounded truncate">
+          <p className="text-sm text-muted truncate">Saldo Apertura</p>
+          <p className="font-semibold truncate">${formatNum(caja.saldoApertura)}</p>
         </div>
-        <div className="bg-green-soft p-3 rounded">
-          <p className="text-sm text-muted">Ventas Brutas</p>
-          <p className="font-semibold text-green">${ventasBrutas}</p>
+        <div className="bg-green-soft p-3 rounded truncate">
+          <p className="text-sm text-muted truncate">Ventas Brutas</p>
+          <p className="font-semibold text-green truncate">${formatNum(ventasBrutas)}</p>
         </div>
-        <div className="bg-red-soft p-3 rounded">
-          <p className="text-sm text-muted">Notas Crédito</p>
-          <p className="font-semibold text-red">-${notaCreditoTotal}</p>
+        <div className="bg-red-soft p-3 rounded truncate">
+          <p className="text-sm text-muted truncate">Notas Crédito</p>
+          <p className="font-semibold text-red truncate">-${formatNum(notaCreditoTotal)}</p>
         </div>
-        <div className="bg-purple-soft p-3 rounded">
-          <p className="text-sm text-muted">Venta Neta</p>
-          <p className="font-semibold text-purple">${ventaNeta}</p>
+        <div className="bg-purple-soft p-3 rounded truncate">
+          <p className="text-sm text-muted truncate">Venta Neta</p>
+          <p className="font-semibold text-purple truncate">${formatNum(ventaNeta)}</p>
         </div>
-        <div className="bg-yellow-soft p-3 rounded">
-          <p className="text-sm text-muted">NC Redimidas</p>
-          <p className="font-semibold text-yellow">-${notaCreditoDescuentoTotal}</p>
+        <div className="bg-yellow-soft p-3 rounded truncate">
+          <p className="text-sm text-muted truncate">NC Redimidas</p>
+          <p className="font-semibold text-yellow truncate">-${formatNum(notaCreditoDescuentoTotal)}</p>
         </div>
-        <div className="bg-blue-soft p-3 rounded">
-          <p className="text-sm text-muted">Efectivo en Caja</p>
-          <p className="font-semibold text-blue">${efectivoCaja}</p>
+        <div className="bg-blue-soft p-3 rounded truncate">
+          <p className="text-sm text-muted truncate">Efectivo en Caja</p>
+          <p className="font-semibold text-blue truncate">${formatNum(efectivoCaja)}</p>
         </div>
       </div>
 
       <div className="mt-4 p-3 bg-blue-soft rounded">
         <p className="text-sm font-semibold mb-2">Ventas por Método:</p>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <p>Efectivo: <span className="font-semibold">${ventasEfectivo}</span></p>
-          <p>Tarjeta: <span className="font-semibold">${ventasTarjeta}</span></p>
-          <p>Débito: <span className="font-semibold">${ventasDebito}</span></p>
-            <p>MP Arista: <span className="font-semibold">${ventasMPArista}</span></p>
-            <p>MP Yanet: <span className="font-semibold">${ventasMPYanet}</span></p>
-          <p>Cuenta DNI: <span className="font-semibold">${ventasCuentaDNI}</span></p>
+          <p className="truncate">Efectivo: <span className="font-semibold">${formatNum(ventasEfectivo)}</span></p>
+          <p className="truncate">Tarjeta: <span className="font-semibold">${formatNum(ventasTarjeta)}</span></p>
+          <p className="truncate">Débito: <span className="font-semibold">${formatNum(ventasDebito)}</span></p>
+          <p className="truncate">Mercado Pago: <span className="font-semibold">${formatNum(ventasMercadoPago)}</span></p>
+          <p className="truncate">Cuenta DNI: <span className="font-semibold">${formatNum(ventasCuentaDNI)}</span></p>
         </div>
       </div>
     </>
