@@ -130,8 +130,7 @@ export const ReportesPage = () => {
         const ventasEfectivo = sumarPagos('efectivo', ventasNormales);
         const ventasTarjeta = sumarPagos('tarjeta', ventasNormales);
         const ventasDebito = sumarPagos('debito', ventasNormales);
-        const ventasMPArista = sumarPagos('mercadopagoarista', ventasNormales);
-        const ventasMPYanet = sumarPagos('mercadopagoyanet', ventasNormales);
+        const ventasMercadoPago = sumarPagos('mercadopago', ventasNormales);
         const ventasCuentaDNI = sumarPagos('cuentadni', ventasNormales);
 
         const ventaNeta = montoVentasNormales - montoNotasCredito;
@@ -152,8 +151,7 @@ export const ReportesPage = () => {
           ventasEfectivo,
           ventasTarjeta,
           ventasDebito,
-          ventasMPArista,
-          ventasMPYanet,
+          ventasMercadoPago,
           ventasCuentaDNI,
           efectivoCaja,
           saldoSistema,

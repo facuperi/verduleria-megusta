@@ -6,10 +6,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice } from '../hooks/useDevice';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { Layout } from '../components/Layout';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
+import { ModalMovimientoStock } from '../components/ModalMovimientoStock';
 import { formatNum } from '../utils/format';
 
 export const StockPage = () => {
@@ -26,6 +28,9 @@ export const StockPage = () => {
   const [eliminando, setEliminando] = useState(false);
   const [sortField, setSortField] = useState('nombre');
   const [sortDir, setSortDir] = useState('asc');
+  const [showMovimiento, setShowMovimiento] = useState(false);
+  const [highlightId, setHighlightId] = useState(null);
+  const [scanError, setScanError] = useState(null);
 
   const [formData, setFormData] = useState({
     tipo: 'noPesable',
@@ -84,15 +89,21 @@ export const StockPage = () => {
         fechaActualizado: new Date().toISOString(),
       };
 
-      if (esPesableSuelto(formData.tipo)) {
-        data.codigoBarras = '';
-        data.stock = 0;
-      } else if (esPesableConStock(formData.tipo)) {
-        data.codigoBarras = '';
-        data.stock = parseFloat(formData.stock) || 0;
+      if (!editando) {
+        if (esPesableSuelto(formData.tipo)) {
+          data.codigoBarras = '';
+          data.stock = 0;
+        } else if (esPesableConStock(formData.tipo)) {
+          data.codigoBarras = '';
+          data.stock = parseFloat(formData.stock) || 0;
+        } else {
+          data.codigoBarras = formData.codigoBarras.trim();
+          data.stock = parseInt(formData.stock) || 0;
+        }
       } else {
-        data.codigoBarras = formData.codigoBarras.trim();
-        data.stock = parseInt(formData.stock) || 0;
+        if (esNoPesable(formData.tipo)) {
+          data.codigoBarras = formData.codigoBarras.trim();
+        }
       }
 
       if (editando) {
@@ -168,6 +179,24 @@ export const StockPage = () => {
     XLSX.writeFile(wb, `productos_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  useBarcodeScanner((codigo) => {
+    const match = productos.find(p => p.codigoBarras === codigo);
+    if (showModal && !editando) {
+      setFormData(prev => ({ ...prev, codigoBarras: codigo, tipo: 'noPesable' }));
+      showToast(`Código ${codigo} cargado`, 'success');
+      return;
+    }
+    if (match) {
+      setBusqueda(codigo);
+      setHighlightId(match.id);
+      setTimeout(() => setHighlightId(null), 2000);
+    } else {
+      setBusqueda(codigo);
+      setScanError(codigo);
+      setTimeout(() => setScanError(null), 4000);
+    }
+  });
+
   const productosFiltrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.codigoBarras?.includes(busqueda)
@@ -188,6 +217,14 @@ export const StockPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Stock</h2>
         <div className="flex gap-2">
+          {isGerente && (
+            <button
+              onClick={() => setShowMovimiento(true)}
+              className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+            >
+              📦 Movimiento de Stock
+            </button>
+          )}
           {isGerente && (
             <button
               onClick={exportarExcel}
@@ -215,6 +252,11 @@ export const StockPage = () => {
           onChange={(e) => setBusqueda(e.target.value)}
           className="w-full border border-line-input bg-input text-body p-2 rounded"
         />
+        {scanError && (
+          <div className="mt-2 p-2 bg-red-soft text-red text-sm rounded flex items-center gap-1 font-semibold">
+            ⚠️ Código <strong>{scanError}</strong> no encontrado en la base de datos
+          </div>
+        )}
       </div>
 
       <div className="bg-card rounded-lg shadow-sm border border-line overflow-hidden">
@@ -234,7 +276,7 @@ export const StockPage = () => {
           </thead>
           <tbody>
             {productosOrdenados.map(producto => (
-              <tr key={producto.id} className="border-t border-line">
+              <tr key={producto.id} className={`border-t border-line transition-colors ${highlightId === producto.id ? 'bg-amber-soft/50' : ''}`}>
                 <td className="px-4 py-2 text-sm">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                     esPesable(producto.tipo) ? 'bg-amber-soft text-amber' : 'bg-blue-soft text-blue'
@@ -254,7 +296,7 @@ export const StockPage = () => {
                     <span className="text-muted">—</span>
                   ) : esPesableConStock(producto.tipo) ? (
                     <span className={`font-semibold ${producto.stock > 0 ? 'text-green' : 'text-red'}`}>
-                      {formatNum(producto.stock || 0)} kg
+                      {formatNum(producto.stock || 0, 3)} kg
                       {producto.stock < 0 && <span className="ml-1 text-xs bg-red-soft text-red px-1 py-0.5 rounded">⚠️ Negativo</span>}
                     </span>
                   ) : (
@@ -336,14 +378,14 @@ export const StockPage = () => {
             />
           </div>
 
-          {!esPesableSuelto(formData.tipo) && (
+          {!editando && !esPesableSuelto(formData.tipo) && (
             <div className="mb-3">
               <label className="block text-sm font-bold mb-1">
                 Stock inicial {esPesableConStock(formData.tipo) ? '(kg)' : ''}
               </label>
               <input
                 type="number"
-                step={esPesableConStock(formData.tipo) ? '0.1' : '1'}
+                step={esPesableConStock(formData.tipo) ? '0.001' : '1'}
                 value={formData.stock}
                 onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                 className="w-full border border-line-input bg-input text-body p-2 rounded"
@@ -361,6 +403,16 @@ export const StockPage = () => {
           </div>
         </form>
       </Modal>
+
+      <ModalMovimientoStock
+        open={showMovimiento}
+        onClose={() => setShowMovimiento(false)}
+        productos={productos}
+        onProductosActualizados={async () => {
+          const snapshot = await getDocs(collection(db, 'productos'));
+          setProductos(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        }}
+      />
     </Layout>
   );
 };

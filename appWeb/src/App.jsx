@@ -11,7 +11,6 @@ import './themes/theme.css';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const VentasPage = lazy(() => import('./pages/VentasPage'));
 const StockPage = lazy(() => import('./pages/StockPage'));
-const MovimientosPage = lazy(() => import('./pages/MovimientosPage'));
 const CajaPage = lazy(() => import('./pages/CajaPage'));
 const ReportesPage = lazy(() => import('./pages/ReportesPage'));
 const UsuariosPage = lazy(() => import('./pages/UsuariosPage'));
@@ -67,11 +66,6 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/ventas" element={<PrivateRoute><VentasPage /></PrivateRoute>} />
                 <Route path="/stock" element={<PrivateRoute><StockPage /></PrivateRoute>} />
-                <Route path="/movimientos" element={
-                  <PrivateRoute requiredRole="gerente">
-                    <MovimientosPage />
-                  </PrivateRoute>
-                } />
                 <Route path="/caja" element={
                   <PrivateRoute>
                     <CajaPage />

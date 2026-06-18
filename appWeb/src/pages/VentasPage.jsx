@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { Layout } from '../components/Layout';
 import { BuscadorProductos } from '../components/BuscadorProductos';
 import { CarritoVentas } from '../components/CarritoVentas';
@@ -105,8 +106,7 @@ export const VentasPage = () => {
   
   // Métodos de pago seleccionados
   const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
-  
-  const inputScannerRef = useRef(null);
+  const [scanError, setScanError] = useState(null);
 
   const esPesable = (tipo) => tipo === 'pesable' || tipo === 'pesableConStock';
 
@@ -206,13 +206,6 @@ export const VentasPage = () => {
     fetchData();
   }, [user]);
 
-  // Focus en input de scanner
-  useEffect(() => {
-    if (inputScannerRef.current && !isMobile) {
-      inputScannerRef.current.focus();
-    }
-  }, [isMobile]);
-
   const buscarProducto = (texto) => {
     const textoLower = texto.toLowerCase().trim();
     return productos.filter(p => 
@@ -258,6 +251,13 @@ export const VentasPage = () => {
     }
     setCarrito(carrito.map(p => 
       p.id === productoId ? { ...p, cantidad: nuevaCantidad } : p
+    ));
+  };
+
+  const cambiarPeso = (productoId, nuevoPeso) => {
+    if (nuevoPeso < 0.001) nuevoPeso = 0.001;
+    setCarrito(carrito.map(p =>
+      p.id === productoId ? { ...p, peso: parseFloat(nuevoPeso.toFixed(3)) } : p
     ));
   };
 
@@ -488,7 +488,7 @@ export const VentasPage = () => {
         const nuevoStock = Math.max(-999999, stockActual + cambio);
         
         await updateDoc(productoRef, {
-          stock: isNaN(nuevoStock) ? 0 : parseFloat(nuevoStock.toFixed(2)),
+          stock: isNaN(nuevoStock) ? 0 : parseFloat(nuevoStock.toFixed(3)),
         });
       }
 
@@ -636,21 +636,19 @@ export const VentasPage = () => {
     }
   };
 
-  // Función para manejar el scanner de código de barras
-  const handleScannerInput = (e) => {
-    const valor = e.target.value;
-    if (valor.length >= 8 && valor.endsWith('\n')) {
-      const codigo = valor.trim();
-      const resultados = buscarProducto(codigo);
-      if (resultados.length === 1) {
-        agregarAlCarrito(resultados[0]);
-        e.target.value = '';
-      } else if (resultados.length > 1) {
-        setBusqueda(codigo);
-      }
-      e.target.value = '';
+  useBarcodeScanner((codigo) => {
+    const resultados = buscarProducto(codigo);
+    if (resultados.length === 1) {
+      agregarAlCarrito(resultados[0]);
+      setBusqueda('');
+    } else if (resultados.length > 1) {
+      setBusqueda(codigo);
+    } else {
+      setBusqueda(codigo);
+      setScanError(codigo);
+      setTimeout(() => setScanError(null), 4000);
     }
-  };
+  });
 
   const productosFiltrados = busqueda ? buscarProducto(busqueda) : [];
 
@@ -683,11 +681,10 @@ export const VentasPage = () => {
             productosFiltrados={productosFiltrados}
             productos={productos}
             agregarComoNotaCredito={agregarComoNotaCredito}
-            inputRef={inputScannerRef}
             onBusquedaChange={setBusqueda}
-            onKeyDown={handleScannerInput}
             onToggleNotaCredito={() => setAgregarComoNotaCredito(!agregarComoNotaCredito)}
             onProductClick={(p) => agregarAlCarrito(p)}
+            scanError={scanError}
           />
         </div>
 
@@ -713,6 +710,7 @@ export const VentasPage = () => {
             onChangeTipoDescuento={setTipoDescuento}
             onAbrirModalTipoDesc={() => setMostrarModalNuevoTipoDesc(true)}
             onCambiarCantidad={actualizarCantidad}
+            onCambiarPeso={cambiarPeso}
             onQuitarDelCarrito={quitarDelCarrito}
             onToggleNotaCredito={toggleNotaCredito}
             onPagoChange={handlePagoChange}

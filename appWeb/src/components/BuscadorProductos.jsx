@@ -5,11 +5,10 @@ export const BuscadorProductos = ({
   productosFiltrados,
   productos,
   agregarComoNotaCredito,
-  inputRef,
   onBusquedaChange,
-  onKeyDown,
   onToggleNotaCredito,
   onProductClick,
+  scanError,
 }) => {
   return (
     <>
@@ -24,14 +23,18 @@ export const BuscadorProductos = ({
           </button>
         </div>
         <input
-          ref={inputRef}
           type="text"
           value={busqueda}
           onChange={(e) => onBusquedaChange(e.target.value)}
-          onKeyDown={onKeyDown}
           placeholder="Escaneá o escribí para buscar..."
           className="w-full border border-line-input bg-input text-body p-2 rounded"
         />
+
+        {scanError && (
+          <div className="mt-2 p-2 bg-red-soft text-red text-sm rounded flex items-center gap-1 font-semibold">
+            ⚠️ Código <strong>{scanError}</strong> no encontrado en la base de datos
+          </div>
+        )}
 
         {busqueda && (
           <div className="mt-2 max-h-60 overflow-y-auto">

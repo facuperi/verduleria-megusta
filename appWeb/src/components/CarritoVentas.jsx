@@ -40,6 +40,7 @@ export const CarritoVentas = ({
   onChangeTipoDescuento,
   onAbrirModalTipoDesc,
   onCambiarCantidad,
+  onCambiarPeso,
   onQuitarDelCarrito,
   onToggleNotaCredito,
   onPagoChange,
@@ -83,11 +84,23 @@ export const CarritoVentas = ({
                     </p>
                     <p className="text-xs text-muted">
                       {esPesable(item.tipo)
-                        ? `$${formatNum(item.precio)} x ${item.peso}kg = $${formatNum(precio)}`
+                        ? `$${formatNum(item.precio)} x ${Number(item.peso || 0).toFixed(3)}kg = $${formatNum(precio, 2)}`
                         : `$${formatNum(precio)} x ${item.cantidad}`}
                     </p>
                   </div>
-                  {!esPesable(item.tipo) && (
+                  {esPesable(item.tipo) ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        value={Number(item.peso || 0).toFixed(3)}
+                        onChange={(e) => onCambiarPeso(item.id, parseFloat(e.target.value) || 0.001)}
+                        className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
+                      />
+                      <span className="text-xs text-muted">kg</span>
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onCambiarCantidad(item.id, item.cantidad - 1)}
