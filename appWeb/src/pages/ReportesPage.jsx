@@ -11,6 +11,8 @@ import { EmptyState } from '../components/EmptyState';
 import { ResumenReportes } from '../components/ResumenReportes';
 import { TablaReportes } from '../components/TablaReportes';
 import { imprimirTicketCajaCerrada } from '../utils/ticketPrinter';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { VarianteSelector } from '../components/VarianteSelector';
 
 export const ReportesPage = () => {
   const { isGerente } = useAuth();
@@ -20,7 +22,6 @@ export const ReportesPage = () => {
   // ==== PASO 1: Estados base ====
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
-  const [negocio, setNegocio] = useState('todos');
   const [tipoMovimiento, setTipoMovimiento] = useState('todos');
   const [tipoRetiro, setTipoRetiro] = useState('todos');
   const [tipoIngreso, setTipoIngreso] = useState('todos');
@@ -37,8 +38,13 @@ export const ReportesPage = () => {
   const [productos, setProductos] = useState([]);
   const [productosSeleccionados, setProductosSeleccionados] = useState([]);
   const [busquedaProducto, setBusquedaProducto] = useState('');
-  const [mostrarSelectorProductos, setMostrarSelectorProductos] = useState(false);
   const [facturaFilter, setFacturaFilter] = useState('todos');
+  const [filtroActivo, setFiltroActivo] = useState('todos');
+  const [flashGreenId, setFlashGreenId] = useState(null);
+  const [scanError, setScanError] = useState(null);
+  const [varianteModal, setVarianteModal] = useState(null);
+
+  const filtrosUnicos = [...new Set(productos.map(p => p.filtro).filter(Boolean))];
 
   const restriction = checkDeviceRestriction('reportes');
   const canAccess = !isMobile && isGerente;
@@ -52,7 +58,7 @@ export const ReportesPage = () => {
       const retiros = retirosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       // 2. Filtrar los que NO tienen campo negocio
-      const retirosSinNegocio = retiros.filter(r => !r.negocio);
+      const retirosSinNegocio = retiros.filter(r => r.negocio === undefined);
       
       if (retirosSinNegocio.length === 0) {
         showToast('No hay retiros para migrar', 'info');
@@ -67,16 +73,21 @@ export const ReportesPage = () => {
           const cajaDoc = await getDoc(doc(db, 'caja', retiro.cajaId));
           if (cajaDoc.exists()) {
             const cajaData = cajaDoc.data();
-            await updateDoc(doc(db, 'retirosCaja', retiro.id), {
-              negocio: cajaData.sucursal
-            });
-            actualizados++;
+            if (cajaData.sucursal !== undefined) {
+              await updateDoc(doc(db, 'retirosCaja', retiro.id), {
+                negocio: cajaData.sucursal
+              });
+              actualizados++;
+            }
           }
         }
       }
       
+      const remaining = (await getDocs(collection(db, 'retirosCaja')))
+        .docs.map(d => d.data())
+        .filter(r => r.negocio === undefined).length;
+      setRetirosPendientes(remaining);
       showToast(`Se actualizaron ${actualizados} retiros`, 'success');
-      setRetirosPendientes(0);
     } catch (err) {
       console.error('Error al migrar:', err);
       showToast('Error al migrar retiros', 'error');
@@ -160,8 +171,11 @@ export const ReportesPage = () => {
         actualizadas++;
       }
 
+      const remainingCajas = (await getDocs(collection(db, 'caja')))
+        .docs.map(d => d.data())
+        .filter(c => c.estado === 'cerrada' && !c.ventasBrutas && c.ventasBrutas !== 0).length;
+      setCajasPendientes(remainingCajas);
       showToast(`Se actualizaron ${actualizadas} cajas`, 'success');
-      setCajasPendientes(0);
     } catch (err) {
       console.error('Error al migrar cajas:', err);
       showToast('Error al migrar cajas', 'error');
@@ -175,7 +189,7 @@ export const ReportesPage = () => {
     const verificarRetiros = async () => {
       const retirosSnapshot = await getDocs(collection(db, 'retirosCaja'));
       const retiros = retirosSnapshot.docs.map(doc => doc.data());
-      const sinNegocio = retiros.filter(r => !r.negocio).length;
+      const sinNegocio = retiros.filter(r => r.negocio === undefined).length;
       setRetirosPendientes(sinNegocio);
 
       const productosSnapshot = await getDocs(collection(db, 'productos'));
@@ -313,12 +327,31 @@ export const ReportesPage = () => {
     setBusquedaProducto('');
   };
 
+  useBarcodeScanner((codigo) => {
+    const matches = productos.filter(p => p.codigoBarras === codigo);
+    if (matches.length === 1) {
+      const p = matches[0];
+      setProductosSeleccionados(prev => prev.includes(p.id) ? prev : [...prev, p.id]);
+      setFlashGreenId(p.id);
+      setTimeout(() => setFlashGreenId(null), 2000);
+      showToast(`✅ ${p.nombre} agregado al filtro`, 'success');
+    } else if (matches.length > 1) {
+      setVarianteModal(matches);
+    } else {
+      setScanError(codigo);
+      setTimeout(() => setScanError(null), 4000);
+    }
+  });
+
+  const handleVariantSelect = (producto) => {
+    setVarianteModal(null);
+    setProductosSeleccionados(prev => prev.includes(producto.id) ? prev : [...prev, producto.id]);
+    setFlashGreenId(producto.id);
+    setTimeout(() => setFlashGreenId(null), 2000);
+    showToast(`✅ ${producto.nombre} agregado al filtro`, 'success');
+  };
+
   const movimientosFiltrados = movimientos
-    .filter(m => {
-      // Filtro por negocio
-      if (negocio === 'todos') return true;
-      return m.negocio === negocio || m.sucursal === negocio;
-    })
     .filter(m => {
       // Filtro por tipo de movimiento
       if (tipoMovimiento === 'todos') return true;
@@ -345,6 +378,16 @@ export const ReportesPage = () => {
       return m.tipoPago?.includes(metodoPago);
     })
     .filter(m => {
+      // Filtro por categoría de producto
+      if (filtroActivo === 'todos') return true;
+      if (m.origen !== 'ventas') return true;
+      const productosVenta = m.productos?.map(p => p.productoId || p.id) || [];
+      return productosVenta.some(pid => {
+        const prod = productos.find(p => p.id === pid);
+        return prod?.filtro === filtroActivo;
+      });
+    })
+    .filter(m => {
       // Filtro por productos seleccionados
       if (tipoMovimiento !== 'ventasNC' || productosSeleccionados.length === 0) return true;
       const productosVenta = m.productos?.map(p => p.productoId || p.id) || [];
@@ -356,7 +399,8 @@ export const ReportesPage = () => {
       if (facturaFilter === 'facturadas') return !!m.cae;
       if (facturaFilter === 'sinFacturar') return !m.cae;
       return true;
-    });
+    })
+    ;
 
   // ==== PASO 4: Calcular resumen ====
   const ventasNormales = movimientosFiltrados
@@ -547,7 +591,6 @@ export const ReportesPage = () => {
       <FiltrosReportes
         fechaDesde={fechaDesde} setFechaDesde={setFechaDesde}
         fechaHasta={fechaHasta} setFechaHasta={setFechaHasta}
-        negocio={negocio} setNegocio={setNegocio}
         tipoMovimiento={tipoMovimiento} setTipoMovimiento={setTipoMovimiento}
         tipoRetiro={tipoRetiro} setTipoRetiro={setTipoRetiro}
         tipoIngreso={tipoIngreso} setTipoIngreso={setTipoIngreso}
@@ -555,10 +598,13 @@ export const ReportesPage = () => {
         facturaFilter={facturaFilter} setFacturaFilter={setFacturaFilter}
         productosSeleccionados={productosSeleccionados} toggleProducto={toggleProducto} limpiarProductos={limpiarProductos}
         busquedaProducto={busquedaProducto} setBusquedaProducto={setBusquedaProducto}
-        mostrarSelectorProductos={mostrarSelectorProductos} setMostrarSelectorProductos={setMostrarSelectorProductos}
         productos={productos}
         cargarMovimientos={cargarMovimientos} loading={loading}
         movimientosFiltrados={movimientosFiltrados} exportarExcel={exportarExcel}
+        scanError={scanError}
+        flashGreenId={flashGreenId}
+        filtroActivo={filtroActivo} setFiltroActivo={setFiltroActivo}
+        filtrosUnicos={filtrosUnicos}
       />
 
       {movimientosFiltrados.length > 0 && (
@@ -580,6 +626,12 @@ export const ReportesPage = () => {
       {!fechaDesde && !fechaHasta && (
         <p className="text-center py-8 text-muted">Seleccioná un rango de fechas para buscar</p>
       )}
+      <VarianteSelector
+        open={varianteModal !== null}
+        productos={varianteModal || []}
+        onSeleccionar={handleVariantSelect}
+        onCancel={() => setVarianteModal(null)}
+      />
     </Layout>
   );
 };

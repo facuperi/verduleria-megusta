@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { VarianteSelector } from './VarianteSelector';
 import { collection, getDocs, addDoc, doc, updateDoc, query, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useToast } from '../contexts/ToastContext';
 import { LoadingSkeleton } from './LoadingSkeleton';
 import { formatNum } from '../utils/format';
+import { useScaleInput } from '../hooks/useScaleInput';
 
 const esKg = (tipo) => tipo === 'pesableConStock';
 const hoy = () => new Date().toISOString().split('T')[0];
@@ -22,10 +24,25 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
   const [historial, setHistorial] = useState([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
   const [scanError, setScanError] = useState(null);
+  const [varianteModal, setVarianteModal] = useState(null);
   const [fechaDesde, setFechaDesde] = useState(hace30dias());
   const [fechaHasta, setFechaHasta] = useState(hoy());
   const [filtroProductoHistorial, setFiltroProductoHistorial] = useState('');
   const [historialLimit, setHistorialLimit] = useState(10);
+  const [scaleEditId, setScaleEditId] = useState(null);
+  const [scaleGrams, setScaleGrams] = useState(0);
+
+  const handlePesoKeyDown = useCallback((e) => {
+    if (e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      setScaleGrams(prev => Math.min(prev * 10 + parseInt(e.key), 9999999));
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      setScaleGrams(prev => Math.floor(prev / 10));
+    } else if (e.key === 'Enter') {
+      document.activeElement?.blur();
+    }
+  }, []);
 
   const cargarHistorial = async (nuevoLimit) => {
     setCargandoHistorial(true);
@@ -57,15 +74,23 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
 
   useBarcodeScanner((codigo) => {
     if (!open) return;
-    const match = productos.find(p => p.tipo !== 'pesable' && p.codigoBarras === codigo);
-    if (match) {
-      agregarALista(match);
-      showToast(`${match.nombre} agregado`, 'success');
+    const matches = productos.filter(p => p.tipo !== 'pesable' && p.codigoBarras === codigo);
+    if (matches.length === 1) {
+      agregarALista(matches[0]);
+      showToast(`${matches[0].nombre} agregado`, 'success');
+    } else if (matches.length > 1) {
+      setVarianteModal(matches);
     } else {
       setScanError(codigo);
       setTimeout(() => setScanError(null), 4000);
     }
   });
+
+  const handleVariantSelect = (producto) => {
+    setVarianteModal(null);
+    agregarALista(producto);
+    showToast(`${producto.nombre} agregado`, 'success');
+  };
 
   if (!open) return null;
 
@@ -86,7 +111,7 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
         p.id === producto.id ? { ...p, cantidad: p.cantidad + inc } : p
       ));
     } else {
-      setLista([...lista, { id: producto.id, nombre: producto.nombre, cantidad: 1, tipo: producto.tipo, signo: 'sumar' }]);
+      setLista([...lista, { id: producto.id, nombre: producto.nombre, cantidad: 0, tipo: producto.tipo, signo: 'sumar' }]);
     }
     setBusqueda('');
   };
@@ -99,7 +124,7 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
 
   const cambiarCantidad = (id, valor) => {
     setLista(lista.map(p =>
-      p.id === id ? { ...p, cantidad: (esKg(p.tipo) ? parseFloat(valor) : parseInt(valor)) || (esKg(p.tipo) ? 0.001 : 1) } : p
+      p.id === id ? { ...p, cantidad: esKg(p.tipo) ? (parseFloat(valor) || 0) : (parseInt(valor) || 0) } : p
     ));
   };
 
@@ -110,6 +135,11 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
   const confirmarMovimiento = async () => {
     if (lista.length === 0) {
       showToast('Agregá al menos un producto', 'warning');
+      return;
+    }
+    const hayCero = lista.some(item => item.cantidad === 0 || item.cantidad === '0');
+    if (hayCero) {
+      showToast('⚠️ No podés mover 0 unidades. Ingresá una cantidad válida.', 'warning');
       return;
     }
     setProcesando(true);
@@ -125,12 +155,18 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
           fechaActualizado: new Date().toISOString(),
         });
 
+        const stockAnterior = producto.stock || 0;
+        const stockResultante = parseFloat((stockAnterior + cambio).toFixed(3));
+
         await addDoc(collection(db, 'movimientosStock'), {
           tipo: item.signo === 'sumar' ? 'ingreso' : 'egreso',
           productoId: item.id,
           productoNombre: producto.nombre,
           cantidad: item.cantidad,
           signo: item.signo,
+          stockAnterior,
+          stockResultante,
+          origen: 'manual',
           realizadoPor: 'gerente',
           fecha: new Date().toISOString(),
         });
@@ -217,14 +253,31 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
                   >
                     {item.signo === 'sumar' ? '+ Ingreso' : '– Egreso'}
                   </button>
-                  <input
-                    type="number"
-                    min={esKg(item.tipo) ? '0.001' : '1'}
-                    step={esKg(item.tipo) ? '0.001' : '1'}
-                    value={item.cantidad}
-                    onChange={(e) => cambiarCantidad(item.id, e.target.value)}
-                    className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
-                  />
+                  {esKg(item.tipo) ? (
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={scaleEditId === item.id ? (scaleGrams / 1000).toFixed(3) : Number(item.cantidad || 0).toFixed(3)}
+                      onFocus={() => { setScaleEditId(item.id); setScaleGrams(Math.round((item.cantidad || 0) * 1000)); }}
+                      onKeyDown={handlePesoKeyDown}
+                      onBlur={() => {
+                        if (scaleEditId === item.id) {
+                          cambiarCantidad(item.id, scaleGrams / 1000);
+                          setScaleEditId(null);
+                        }
+                      }}
+                      className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={item.cantidad}
+                      onChange={(e) => cambiarCantidad(item.id, e.target.value)}
+                      className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
+                    />
+                  )}
                   {esKg(item.tipo) && <span className="text-xs text-muted w-6">kg</span>}
                   <button onClick={() => quitarDeLista(item.id)} className="text-red ml-1">✕</button>
                 </div>
@@ -302,6 +355,8 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
                         <th className="text-left py-1 pr-2">Fecha</th>
                         <th className="text-left py-1 pr-2">Producto</th>
                         <th className="text-center py-1 pr-2">Cant</th>
+                        <th className="text-center py-1 pr-2">Stock Ant.</th>
+                        <th className="text-center py-1 pr-2">Stock Res.</th>
                         <th className="text-left py-1">Tipo</th>
                       </tr>
                     </thead>
@@ -315,6 +370,8 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
                           <td className={`py-1 pr-2 text-center font-semibold ${(m.signo === 'sumar' || m.tipo === 'ingreso') ? 'text-green' : 'text-red'}`}>
                             {(m.signo === 'sumar' || m.tipo === 'ingreso') ? '+' : '-'}{m.cantidad}
                           </td>
+                          <td className="py-1 pr-2 text-center text-muted">{m.stockAnterior ?? '-'}</td>
+                          <td className="py-1 pr-2 text-center font-semibold">{m.stockResultante ?? '-'}</td>
                           <td className="py-1">
                             <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
                               m.tipo === 'ingreso' ? 'bg-green-soft text-green' : m.tipo === 'egreso' ? 'bg-red-soft text-red' : 'bg-purple-soft text-purple'
@@ -342,6 +399,13 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
           </div>
         </div>
       </div>
+
+      <VarianteSelector
+        open={varianteModal !== null}
+        productos={varianteModal || []}
+        onSeleccionar={handleVariantSelect}
+        onCancel={() => setVarianteModal(null)}
+      />
     </div>
   );
 };

@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, doc, query, where, getDoc, serverTimestamp } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { collection, getDocs, addDoc, updateDoc, doc, setDoc, query, where, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useDevice, checkDeviceRestriction } from '../hooks/useDevice';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { ModalPesarProducto } from '../components/ModalPesarProducto';
+import { ModalHuevos } from '../components/ModalHuevos';
+import { ModalLenaCarbon } from '../components/ModalLenaCarbon';
 import { Layout } from '../components/Layout';
 import { BuscadorProductos } from '../components/BuscadorProductos';
 import { CarritoVentas } from '../components/CarritoVentas';
+import { VarianteSelector } from '../components/VarianteSelector';
 import { imprimirTicketAFavor, imprimirTicketVenta } from '../utils/ticketPrinter';
 import { Modal } from '../components/Modal';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
@@ -26,15 +30,16 @@ const METODOS_PAGO = [
 ];
 
 const calcularIva = (total) => {
-  const neto = Math.round(total / 1.21 * 100) / 100;
+  const neto = Math.round(total / 1.105 * 100) / 100;
   const iva = Math.round((total - neto) * 100) / 100;
   return { neto, iva };
 };
 
-const calcularDescuento = (pago, totalBase = 0) => {
+const calcularDescuento = (pago) => {
   if (!pago.descuentoTipo || !pago.descuentoValor) return 0;
   const valor = parseFloat(pago.descuentoValor) || 0;
-  const base = Math.max(0, totalBase);
+  const base = Math.max(0, parseFloat(pago.monto) || 0);
+  if (!base) return 0;
   if (pago.descuentoTipo === 'porcentaje') return base * valor / 100;
   if (pago.descuentoTipo === 'fijo') return valor;
   return 0;
@@ -67,6 +72,10 @@ const facturarVenta = async (ventaId, total, tipoFactura, documentoCliente) => {
     throw error;
   }
 };
+
+const ORDEN_PRESENTACIONES = ['x6', 'x12', 'x20', 'x30'];
+const presentacionesToArray = (obj) =>
+  ORDEN_PRESENTACIONES.filter(k => obj[k]).map(k => ({ nombre: k, ...obj[k] }));
 
 export const VentasPage = () => {
   const { user } = useAuth();
@@ -107,6 +116,22 @@ export const VentasPage = () => {
   // Métodos de pago seleccionados
   const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
   const [scanError, setScanError] = useState(null);
+  const [flashGreenId, setFlashGreenId] = useState(null);
+  const [varianteModal, setVarianteModal] = useState(null);
+
+  const [montoToFixIndex, setMontoToFixIndex] = useState(null);
+  const [lastChangedPagoIndex, setLastChangedPagoIndex] = useState(null);
+  const [productoPesando, setProductoPesando] = useState(null);
+  const [mostrarModalFV, setMostrarModalFV] = useState(false);
+  const [fvTotalInput, setFvTotalInput] = useState('');
+  const nextCarritoKey = useRef(0);
+
+  const [huevosStock, setHuevosStock] = useState(0);
+  const [huevosPresentaciones, setHuevosPresentaciones] = useState([]);
+  const [mostrarModalHuevos, setMostrarModalHuevos] = useState(false);
+  const [mostrarModalLenaCarbon, setMostrarModalLenaCarbon] = useState(false);
+  const [filtroActivo, setFiltroActivo] = useState('todos');
+  const [ordenActivo, setOrdenActivo] = useState('default');
 
   const esPesable = (tipo) => tipo === 'pesable' || tipo === 'pesableConStock';
 
@@ -127,7 +152,7 @@ export const VentasPage = () => {
   const diferencia = totalVenta - totalNotaCredito;
   const total = Math.max(0, diferencia);
 
-  const totalDescuentos = pagosSeleccionados.reduce((sum, p) => sum + calcularDescuento(p, diferencia), 0);
+  const totalDescuentos = pagosSeleccionados.reduce((sum, p) => sum + calcularDescuento(p), 0);
   const montoBaseNC = Math.max(0, diferencia - totalDescuentos);
   const montoNCReal = parseFloat(notaCreditoOriginal) || 0;
   const notaCreditoDescuento = Math.min(montoNCReal, montoBaseNC);
@@ -137,24 +162,20 @@ export const VentasPage = () => {
   useEffect(() => {
     if (carrito.length === 0) return;
     setPagosSeleccionados(prev => {
-      const target = Math.max(0, totalConDescuento);
+      const target = Math.max(0, diferencia);
       const sumActual = prev.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
       if (Math.abs(sumActual - target) < 0.01) return prev;
-
-      if (target === 0) {
-        return prev.map(p => ({ ...p, monto: 0 }));
-      }
-
+      if (target === 0) return prev.map(p => ({ ...p, monto: 0 }));
       if (sumActual === 0) {
         return [{ metodo: 'efectivo', monto: target, descuentoTipo: null, descuentoValor: 0 }];
       }
-
       return prev.map(p => ({
         ...p,
         monto: Math.round((parseFloat(p.monto) || 0) / sumActual * target * 100) / 100,
       }));
     });
-  }, [carrito.length, totalConDescuento, notaCreditoOriginal]);
+    setMontoToFixIndex(null);
+  }, [diferencia, notaCreditoOriginal]);
 
   const tienePagoTarjeta = pagosSeleccionados.some(p => p.metodo === 'tarjeta');
   
@@ -182,6 +203,29 @@ export const VentasPage = () => {
           setCaja(cajaData);
         } else {
           setCaja(null);
+        }
+
+        // Cargar huevos
+        const huevoRef = doc(db, 'productos', 'huevos');
+        const huevoSnap = await getDoc(huevoRef);
+        const PRESENTACIONES_DEFECTO = {
+          x6: { unidades: 6, precio: 1500 },
+          x12: { unidades: 12, precio: 2800 },
+          x20: { unidades: 20, precio: 4500 },
+          x30: { unidades: 30, precio: 6500 },
+        };
+        if (huevoSnap.exists()) {
+          const data = huevoSnap.data();
+          setHuevosStock(data.stock || 0);
+          const presentaciones = data.presentaciones || PRESENTACIONES_DEFECTO;
+          setHuevosPresentaciones(presentacionesToArray(presentaciones));
+          if (!data.presentaciones) {
+            await updateDoc(huevoRef, { presentaciones: PRESENTACIONES_DEFECTO });
+          }
+        } else {
+          await setDoc(huevoRef, { nombre: 'Huevos', tipo: 'huevos', stock: 0, presentaciones: PRESENTACIONES_DEFECTO });
+          setHuevosStock(0);
+          setHuevosPresentaciones(presentacionesToArray(PRESENTACIONES_DEFECTO));
         }
 
         // Cargar tipos de descuento
@@ -214,65 +258,195 @@ export const VentasPage = () => {
     );
   };
 
-  const agregarAlCarrito = (producto) => {
-    if (esPesable(producto.tipo)) {
+  const agregarAlCarrito = (producto, peso) => {
+    if (!caja) {
+      showToast('⚠️ No hay caja abierta. Abrí la caja primero.', 'warning');
+      return;
+    }
+    if (producto.id === '__frutas_verduras__') {
+      setMostrarModalFV(true);
+      setFvTotalInput('');
+      return;
+    }
+    if (producto.id === '__huevos__') {
+      setMostrarModalHuevos(true);
+      return;
+    }
+    if (producto.id === '__lena_carbon__') {
+      setMostrarModalLenaCarbon(true);
+      return;
+    }
+    if (peso !== undefined) {
       if (!agregarComoNotaCredito && producto.tipo === 'pesableConStock' && (producto.stock || 0) <= 0) {
         showToast(`⚠️ ${producto.nombre} no tiene existencias` + (producto.stock < 0 ? ` (stock: ${producto.stock})` : ''), 'warning');
       }
-      setCarrito([...carrito, { ...producto, cantidad: 1, peso: 1, esNotaCredito: false }]);
+      setCarrito([...carrito, { ...producto, cantidad: 1, peso, _key: ++nextCarritoKey.current, esNotaCredito: agregarComoNotaCredito }]);
       setBusqueda('');
       setVentaExitosa(null);
+      return;
+    }
+    if (esPesable(producto.tipo)) {
+      setProductoPesando(producto);
       return;
     }
     if (!agregarComoNotaCredito && caja && (producto.stock || 0) <= 0) {
       showToast(`⚠️ ${producto.nombre} no tiene existencias` + (producto.stock < 0 ? ` (stock: ${producto.stock})` : ''), 'warning');
     }
-    const existe = carrito.find(p => p.id === producto.id);
+    const existe = carrito.find(p => p.id === producto.id && p.esNotaCredito === agregarComoNotaCredito);
     if (existe) {
       setCarrito(carrito.map(p => 
-        p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
+        p.id === producto.id && p.esNotaCredito === agregarComoNotaCredito ? { ...p, cantidad: p.cantidad + 1 } : p
       ));
     } else {
-      setCarrito([...carrito, { ...producto, cantidad: 1, esNotaCredito: agregarComoNotaCredito }]);
+      setCarrito([...carrito, { ...producto, cantidad: 1, _key: ++nextCarritoKey.current, esNotaCredito: agregarComoNotaCredito }]);
     }
     setBusqueda('');
     setVentaExitosa(null);
   };
 
-  const quitarDelCarrito = (productoId) => {
-    setCarrito(carrito.filter(p => p.id !== productoId));
+  const quitarDelCarrito = (carritoKey) => {
+    setCarrito(carrito.filter(p => p._key !== carritoKey));
     setVentaExitosa(null);
   };
 
-  const actualizarCantidad = (productoId, nuevaCantidad) => {
+  const actualizarCantidad = (carritoKey, nuevaCantidad) => {
     if (nuevaCantidad < 1) {
-      quitarDelCarrito(productoId);
+      quitarDelCarrito(carritoKey);
       return;
     }
     setCarrito(carrito.map(p => 
-      p.id === productoId ? { ...p, cantidad: nuevaCantidad } : p
+      p._key === carritoKey ? { ...p, cantidad: nuevaCantidad } : p
     ));
   };
 
-  const cambiarPeso = (productoId, nuevoPeso) => {
+  const cambiarPeso = (carritoKey, nuevoPeso) => {
     if (nuevoPeso < 0.001) nuevoPeso = 0.001;
     setCarrito(carrito.map(p =>
-      p.id === productoId ? { ...p, peso: parseFloat(nuevoPeso.toFixed(3)) } : p
+      p._key === carritoKey ? { ...p, peso: parseFloat(nuevoPeso.toFixed(3)) } : p
     ));
   };
 
-  const toggleNotaCredito = (productoId) => {
+  const handleConfirmPeso = (peso) => {
+    if (!productoPesando) return
+    agregarAlCarrito(productoPesando, peso)
+    setProductoPesando(null)
+  }
+
+  const handleCancelPeso = () => {
+    setProductoPesando(null)
+  }
+
+  const handleConfirmFV = () => {
+    const total = parseFloat(fvTotalInput) || 0;
+    if (total <= 0) return;
+    setCarrito([...carrito, { id: `__frutas_verduras__${Date.now()}`, nombre: 'Frutas y Verduras', precio: total, cantidad: 1, tipo: 'frutasVerduras', _key: ++nextCarritoKey.current, esNotaCredito: false, esFrutasVerduras: true }]);
+    setMostrarModalFV(false);
+    setFvTotalInput('');
+    setBusqueda('');
+    setVentaExitosa(null);
+  }
+
+  const handleConfirmHuevos = (presentacion, cantidad) => {
+    const itemId = `__huevos__${presentacion.nombre}_${Date.now()}`;
+    setCarrito([...carrito, {
+      id: itemId,
+      nombre: `Huevos ${presentacion.nombre}`,
+      precio: presentacion.precio,
+      cantidad,
+      tipo: 'huevos',
+      esHuevos: true,
+      presentacion: presentacion.nombre,
+      unidades: presentacion.unidades,
+      _key: ++nextCarritoKey.current,
+      esNotaCredito: false,
+    }]);
+    setMostrarModalHuevos(false);
+    setBusqueda('');
+    setVentaExitosa(null);
+  }
+
+  const handleRegistrarRoturaHuevos = async (unidades) => {
+    if (!unidades || unidades < 1) return;
+    try {
+      const huevoRef = doc(db, 'productos', 'huevos');
+      const huevoDoc = await getDoc(huevoRef);
+      const stockActual = huevoDoc.data().stock || 0;
+      const nuevoStock = Math.max(0, stockActual - unidades);
+      await updateDoc(huevoRef, { stock: nuevoStock });
+      setHuevosStock(nuevoStock);
+
+      setMostrarModalHuevos(false);
+      showToast(`✅ Registrada rotura de ${unidades} huevos`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al registrar rotura', 'error');
+    }
+  }
+
+  const handleActualizarPresentacionHuevos = async (nombre, nuevoPrecio) => {
+    try {
+      const huevoRef = doc(db, 'productos', 'huevos');
+      const huevoSnap = await getDoc(huevoRef);
+      const data = huevoSnap.data();
+      const presentaciones = { ...(data.presentaciones || {}) };
+      presentaciones[nombre] = { ...presentaciones[nombre], precio: nuevoPrecio };
+      await updateDoc(huevoRef, { presentaciones });
+      setHuevosPresentaciones(presentacionesToArray(presentaciones));
+      showToast(`Precio de ${nombre} actualizado`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al actualizar precio', 'error');
+    }
+  }
+
+  const handleActualizarPrecioProducto = async (producto, nuevoPrecio) => {
+    try {
+      await updateDoc(doc(db, 'productos', producto.id), { precio: nuevoPrecio });
+      setProductos(productos.map(p =>
+        p.id === producto.id ? { ...p, precio: nuevoPrecio } : p
+      ));
+      showToast(`Precio de ${producto.nombre} actualizado`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al actualizar precio', 'error');
+    }
+  }
+
+  const handleConfirmLenaCarbon = (producto, cantidad) => {
+    const existe = carrito.find(p => p.id === producto.id && p.esNotaCredito === agregarComoNotaCredito);
+    if (existe) {
+      setCarrito(carrito.map(p =>
+        p.id === producto.id && p.esNotaCredito === agregarComoNotaCredito ? { ...p, cantidad: p.cantidad + cantidad } : p
+      ));
+    } else {
+      setCarrito([...carrito, { ...producto, cantidad, _key: ++nextCarritoKey.current, esNotaCredito: agregarComoNotaCredito }]);
+    }
+    setMostrarModalLenaCarbon(false);
+    setBusqueda('');
+    setVentaExitosa(null);
+  }
+
+  const cambiarPrecioFV = (carritoKey, nuevoPrecio) => {
+    const total = Math.max(0, parseFloat(nuevoPrecio) || 0);
+    if (total === 0) {
+      setCarrito(carrito.filter(p => p._key !== carritoKey));
+    } else {
+      setCarrito(carrito.map(p =>
+        p._key === carritoKey ? { ...p, precio: total } : p
+      ));
+    }
+  }
+
+  const toggleNotaCredito = (carritoKey) => {
     setCarrito(carrito.map(p => 
-      p.id === productoId ? { ...p, esNotaCredito: !p.esNotaCredito } : p
+      p._key === carritoKey ? { ...p, esNotaCredito: !p.esNotaCredito } : p
     ));
   };
 
   const autoAjustarMontos = (pagos, changedIndex) => {
-    const descs = pagos.reduce((sum, p) => sum + calcularDescuento(p, diferencia), 0);
-    const nuevoTotalConDesc = Math.max(0, diferencia - descs);
     const idx = changedIndex !== undefined ? changedIndex : 0;
     const sumaOtros = pagos.reduce((sum, p, i) => i !== idx ? sum + (parseFloat(p.monto) || 0) : sum, 0);
-    const nuevoMonto = Math.round(Math.max(0, nuevoTotalConDesc - sumaOtros) * 100) / 100;
+    const nuevoMonto = Math.round(Math.max(0, diferencia - sumaOtros) * 100) / 100;
     const actual = Math.round((parseFloat(pagos[idx]?.monto) || 0) * 100) / 100;
     if (Math.abs(nuevoMonto - actual) >= 0.01) {
       pagos[idx] = { ...pagos[idx], monto: nuevoMonto };
@@ -286,8 +460,26 @@ export const VentasPage = () => {
     if (campo === 'metodo') {
       const yaExiste = nuevosPagos.some((p, i) => i !== index && p.metodo === valor);
       if (yaExiste) return;
+      nuevosPagos[index] = {
+        ...nuevosPagos[index],
+        metodo: valor,
+      };
+    } else if (campo === 'monto') {
+      const val = parseFloat(valor) || 0;
+      nuevosPagos[index] = { ...nuevosPagos[index], monto: val };
+      const sumaTotal = nuevosPagos.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
+      if (Math.abs(sumaTotal - diferencia) > 0.01 && nuevosPagos.length > 1) {
+        setLastChangedPagoIndex(index);
+        const fixIdx = index === 0 ? nuevosPagos.length - 1 : 0;
+        setMontoToFixIndex(fixIdx);
+      } else {
+        setMontoToFixIndex(null);
+      }
+      setPagosSeleccionados(nuevosPagos);
+      return;
+    } else {
+      nuevosPagos[index] = { ...nuevosPagos[index], [campo]: valor };
     }
-    nuevosPagos[index] = { ...nuevosPagos[index], [campo]: valor };
     if (campo === 'descuentoValor') {
       autoAjustarMontos(nuevosPagos, index);
     }
@@ -296,32 +488,36 @@ export const VentasPage = () => {
 
   const handleDescuentoTipo = (index, tipo) => {
     const nuevosPagos = [...pagosSeleccionados];
-    const actual = nuevosPagos[index].descuentoTipo;
-    nuevosPagos[index] = {
-      ...nuevosPagos[index],
-      descuentoTipo: actual === tipo ? null : tipo,
-      descuentoValor: actual === tipo ? 0 : nuevosPagos[index].descuentoValor,
-    };
+    if (tipo === '10pct') {
+      const yaActivo = nuevosPagos[index].descuentoTipo === 'porcentaje' && nuevosPagos[index].descuentoValor == 10;
+      nuevosPagos[index] = {
+        ...nuevosPagos[index],
+        descuentoTipo: yaActivo ? null : 'porcentaje',
+        descuentoValor: yaActivo ? 0 : 10,
+      };
+    } else {
+      const actual = nuevosPagos[index].descuentoTipo;
+      nuevosPagos[index] = {
+        ...nuevosPagos[index],
+        descuentoTipo: actual === tipo ? null : tipo,
+        descuentoValor: actual === tipo ? 0 : nuevosPagos[index].descuentoValor,
+      };
+    }
     autoAjustarMontos(nuevosPagos, index);
     setPagosSeleccionados(nuevosPagos);
   };
 
-  const handleDescuento10 = (index) => {
-    const nuevosPagos = [...pagosSeleccionados];
-    const yaActivo = nuevosPagos[index].descuentoTipo === 'porcentaje' && nuevosPagos[index].descuentoValor == 10;
-    nuevosPagos[index] = {
-      ...nuevosPagos[index],
-      descuentoTipo: yaActivo ? null : 'porcentaje',
-      descuentoValor: yaActivo ? 0 : 10,
-    };
-    autoAjustarMontos(nuevosPagos, index);
-    setPagosSeleccionados(nuevosPagos);
+  const handleMontoBlur = () => {
+    // No auto-ajustar para no pisar el ingreso manual del usuario
   };
 
-  const handleMontoBlur = (index) => {
+  const handleFixMontoClick = (index) => {
+    if (montoToFixIndex !== index) return;
     const nuevosPagos = [...pagosSeleccionados];
-    autoAjustarMontos(nuevosPagos, index);
+    const otrosSum = nuevosPagos.reduce((s, p, i) => i !== index ? s + (parseFloat(p.monto) || 0) : s, 0);
+    nuevosPagos[index] = { ...nuevosPagos[index], monto: Math.round(Math.max(0, diferencia - otrosSum) * 100) / 100 };
     setPagosSeleccionados(nuevosPagos);
+    setMontoToFixIndex(null);
   };
 
   const agregarMetodoPago = () => {
@@ -419,8 +615,8 @@ export const VentasPage = () => {
     }
     if (carrito.length === 0) return;
     
-    if (Math.abs(totalPagos - totalConDescuento) > 0.01) {
-      setError(`Los pagos suman $${totalPagos} pero deberían sumar $${totalConDescuento}`);
+    if (Math.abs(totalPagos - total) > 0.01) {
+      setError(`Los pagos suman $${totalPagos} pero el total de venta es $${total}`);
       return;
     }
 
@@ -436,6 +632,9 @@ export const VentasPage = () => {
       if (tieneNotaCredito && tieneVentaNormal) tipoVenta = 'mixta';
       else if (tieneNotaCredito) tipoVenta = 'notaCredito';
 
+      const carritoSobranteNC = diferencia < 0 ? Math.abs(diferencia) : 0;
+      const saldoFavorTotal = sobranteNC + carritoSobranteNC;
+
       const productosVenta = carrito.map(item => ({
         productoId: item.id,
         nombre: item.nombre,
@@ -443,6 +642,8 @@ export const VentasPage = () => {
         precio: item.precio,
         ...(item.peso !== undefined && { peso: item.peso }),
         esNotaCredito: item.esNotaCredito || false,
+        ...(item.esFrutasVerduras && { esFrutasVerduras: true }),
+        ...(item.esHuevos && { esHuevos: true, presentacion: item.presentacion, unidades: item.unidades }),
       }));
 
       const ventaDoc = await addDoc(collection(db, 'ventas'), {
@@ -455,7 +656,7 @@ export const VentasPage = () => {
         observacion: observacion || null,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
         pagos: pagosSeleccionados.map(p => {
-          const desc = calcularDescuento(p, diferencia);
+          const desc = calcularDescuento(p);
           return {
             metodo: p.metodo,
             monto: parseFloat(p.monto) || 0,
@@ -466,7 +667,7 @@ export const VentasPage = () => {
         }),
         ...(notaCreditoDescuento > 0 && { notaCreditoDescuento }),
         ...(montoNCReal > 0 && { notaCreditoOriginal: montoNCReal }),
-        ...(sobranteNC > 0 && { nuevoSaldoFavor: sobranteNC }),
+        ...(saldoFavorTotal > 0 && { nuevoSaldoFavor: saldoFavorTotal }),
         facturada: false,
         usuarioId: user.uid,
         usuarioNombre: user.email || 'Usuario',
@@ -476,7 +677,14 @@ export const VentasPage = () => {
       });
 
       // Actualizar stock
+      let huevosUnidades = 0;
       for (const item of carrito) {
+        if (item.esFrutasVerduras) continue;
+        if (item.esHuevos) {
+          const factor = item.esNotaCredito ? 1 : -1;
+          huevosUnidades += factor * item.unidades * item.cantidad;
+          continue;
+        }
         if (item.tipo === 'pesable') continue;
         const productoRef = doc(db, 'productos', item.id);
         const productoDoc = await getDoc(productoRef);
@@ -491,13 +699,22 @@ export const VentasPage = () => {
           stock: isNaN(nuevoStock) ? 0 : parseFloat(nuevoStock.toFixed(3)),
         });
       }
+      if (huevosUnidades !== 0) {
+        const huevoRef = doc(db, 'productos', 'huevos');
+        const huevoDoc = await getDoc(huevoRef);
+        const huevoStock = huevoDoc.data().stock || 0;
+        await updateDoc(huevoRef, {
+          stock: Math.max(0, huevoStock + huevosUnidades),
+        });
+        setHuevosStock(Math.max(0, huevoStock + huevosUnidades));
+      }
 
       // Actualizar caja - ventas por método
       const updateData = {};
       let totalDescuentosCaja = 0;
       for (const pago of pagosSeleccionados) {
         const monto = parseFloat(pago.monto) || 0;
-        totalDescuentosCaja += calcularDescuento(pago, diferencia);
+        totalDescuentosCaja += calcularDescuento(pago);
         if (monto > 0) {
           const campoKey = {
             'efectivo': 'ventasEfectivo',
@@ -532,6 +749,7 @@ export const VentasPage = () => {
       
       setCarrito([]);
       setPagosSeleccionados([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
+      setMontoToFixIndex(null);
       setObservacion('');
       setFacturaData(null);
       setAgregarComoNotaCredito(false);
@@ -541,24 +759,25 @@ export const VentasPage = () => {
       setMostrarInputNC(false);
       
       const pagosConDescuento = pagosSeleccionados.map(p => {
-        const desc = calcularDescuento(p, diferencia);
+        const desc = calcularDescuento(p);
         return {
           metodo: p.metodo,
           monto: parseFloat(p.monto) || 0,
           descuentoTipo: desc > 0 ? p.descuentoTipo : null,
           descuentoValor: desc > 0 ? (parseFloat(p.descuentoValor) || 0) : 0,
-          montoReal: parseFloat(p.monto) || 0,
+          montoReal: Math.max(0, (parseFloat(p.monto) || 0) - desc),
         };
       });
       const nuevaVenta = {
         id: ventaDoc.id,
         total: totalConDescuento,
+        subtotal: diferencia,
         productos: productosVenta,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
         pagos: pagosConDescuento,
         tipoVenta,
         notaCreditoDescuento: notaCreditoDescuento > 0 ? notaCreditoDescuento : undefined,
-        nuevoSaldoFavor: sobranteNC > 0 ? sobranteNC : undefined,
+        nuevoSaldoFavor: saldoFavorTotal > 0 ? saldoFavorTotal : undefined,
       };
       setVentaExitosa(nuevaVenta);
       
@@ -637,12 +856,14 @@ export const VentasPage = () => {
   };
 
   useBarcodeScanner((codigo) => {
-    const resultados = buscarProducto(codigo);
+    const resultados = productos.filter(p => p.codigoBarras === codigo);
     if (resultados.length === 1) {
+      setFlashGreenId(resultados[0].id);
+      setTimeout(() => setFlashGreenId(null), 600);
       agregarAlCarrito(resultados[0]);
       setBusqueda('');
     } else if (resultados.length > 1) {
-      setBusqueda(codigo);
+      setVarianteModal(resultados);
     } else {
       setBusqueda(codigo);
       setScanError(codigo);
@@ -650,7 +871,33 @@ export const VentasPage = () => {
     }
   });
 
-  const productosFiltrados = busqueda ? buscarProducto(busqueda) : [];
+  const handleVariantSelect = (producto) => {
+    setVarianteModal(null);
+    setFlashGreenId(producto.id);
+    setTimeout(() => setFlashGreenId(null), 600);
+    agregarAlCarrito(producto);
+    setBusqueda('');
+  };
+
+  const productosVisibles = (() => {
+    let lista = [...productos];
+    if (filtroActivo !== 'todos') {
+      lista = lista.filter(p => p.filtro === filtroActivo);
+    }
+    if (busqueda) {
+      const texto = busqueda.toLowerCase().trim();
+      lista = lista.filter(p =>
+        p.codigoBarras?.toLowerCase().includes(texto) ||
+        p.nombre?.toLowerCase().includes(texto)
+      );
+    }
+    if (ordenActivo === 'az') {
+      lista.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+    } else if (ordenActivo === 'za') {
+      lista.sort((a, b) => (b.nombre || '').localeCompare(a.nombre || ''));
+    }
+    return lista;
+  })();
 
   if (loading) {
     return <Layout><LoadingSkeleton type="page" /></Layout>;
@@ -674,17 +921,24 @@ export const VentasPage = () => {
         </div>
       )}
 
+      <h2 className="text-2xl font-bold mb-4">Ventas</h2>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
           <BuscadorProductos
             busqueda={busqueda}
-            productosFiltrados={productosFiltrados}
-            productos={productos}
+            productos={productosVisibles}
+            productosTodos={productos}
             agregarComoNotaCredito={agregarComoNotaCredito}
             onBusquedaChange={setBusqueda}
             onToggleNotaCredito={() => setAgregarComoNotaCredito(!agregarComoNotaCredito)}
             onProductClick={(p) => agregarAlCarrito(p)}
             scanError={scanError}
+            flashGreenId={flashGreenId}
+            filtroActivo={filtroActivo}
+            ordenActivo={ordenActivo}
+            onChangeFiltro={setFiltroActivo}
+            onChangeOrden={setOrdenActivo}
           />
         </div>
 
@@ -705,24 +959,23 @@ export const VentasPage = () => {
             error={error}
             tiposDescuento={tiposDescuento}
             tipoDescuento={tipoDescuento}
-            pesoActual={null}
-            conectandoBalanza={false}
             onChangeTipoDescuento={setTipoDescuento}
             onAbrirModalTipoDesc={() => setMostrarModalNuevoTipoDesc(true)}
             onCambiarCantidad={actualizarCantidad}
             onCambiarPeso={cambiarPeso}
+            onCambiarPrecioFV={cambiarPrecioFV}
             onQuitarDelCarrito={quitarDelCarrito}
             onToggleNotaCredito={toggleNotaCredito}
             onPagoChange={handlePagoChange}
             onDescuentoTipo={handleDescuentoTipo}
-            onDescuento10={handleDescuento10}
             onMontoBlur={handleMontoBlur}
             onAgregarMetodoPago={agregarMetodoPago}
+            montoToFixIndex={montoToFixIndex}
+            onFixMontoClick={handleFixMontoClick}
             onQuitarMetodoPago={quitarMetodoPago}
             onObservacionChange={setObservacion}
             onImprimirAFavor={() => imprimirTicketAFavor(diferencia, caja, user?.email)}
             onRealizarVenta={realizarVenta}
-            onConectarBalanza={() => {}}
             notaCreditoOriginal={notaCreditoOriginal}
             mostrarInputNC={mostrarInputNC}
             notaCreditoDescuento={notaCreditoDescuento}
@@ -732,6 +985,61 @@ export const VentasPage = () => {
               if (mostrarInputNC) setNotaCreditoOriginal('');
               setMostrarInputNC(!mostrarInputNC);
             }}
+          />
+
+          <ModalPesarProducto
+            producto={productoPesando}
+            open={!!productoPesando}
+            onConfirm={handleConfirmPeso}
+            onCancel={handleCancelPeso}
+          />
+
+          <Modal open={mostrarModalFV} onClose={() => setMostrarModalFV(false)} title="🍎 Frutas y Verduras" className="max-w-sm">
+            <p className="text-sm text-muted mb-3">Ingresá el total del ticket de la balanza</p>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={fvTotalInput}
+              onChange={(e) => setFvTotalInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && parseFloat(fvTotalInput) > 0) handleConfirmFV(); }}
+              placeholder="0.00"
+              className="w-full border-2 border-line-input bg-input text-body p-3 rounded text-center text-2xl font-bold mb-4"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setMostrarModalFV(false)}
+                className="flex-1 px-4 py-2 rounded border border-line text-secondary hover:text-body"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmFV}
+                disabled={!fvTotalInput || parseFloat(fvTotalInput) <= 0}
+                className="flex-1 px-4 py-2 rounded bg-amber text-white font-semibold hover:bg-amber/80 disabled:opacity-50"
+              >
+                Agregar al carrito
+              </button>
+            </div>
+          </Modal>
+
+          <ModalHuevos
+            open={mostrarModalHuevos}
+            onClose={() => setMostrarModalHuevos(false)}
+            onConfirm={handleConfirmHuevos}
+            onRegistrarRotura={handleRegistrarRoturaHuevos}
+            onActualizarPresentacion={handleActualizarPresentacionHuevos}
+            presentaciones={huevosPresentaciones}
+            stock={huevosStock}
+          />
+
+          <ModalLenaCarbon
+            open={mostrarModalLenaCarbon}
+            onClose={() => setMostrarModalLenaCarbon(false)}
+            onConfirm={handleConfirmLenaCarbon}
+            onActualizarPrecio={handleActualizarPrecioProducto}
+            productos={productos.filter(p => p.filtro === 'Leña' || p.filtro === 'Carbón')}
           />
 
           {ventaExitosa && (
@@ -873,6 +1181,13 @@ export const VentasPage = () => {
           </button>
         </div>
       </Modal>
+
+      <VarianteSelector
+        open={varianteModal !== null}
+        productos={varianteModal || []}
+        onSeleccionar={handleVariantSelect}
+        onCancel={() => setVarianteModal(null)}
+      />
     </Layout>
   );
 };

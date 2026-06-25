@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatNum } from '../utils/format';
 import { EmptyState } from './EmptyState';
 
@@ -9,10 +10,12 @@ const METODOS_PAGO = [
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
 ];
 
-const calcularDescuento = (pago, totalBase = 0) => {
+const calcularDescuento = (pago) => {
   if (!pago.descuentoTipo || !pago.descuentoValor) return 0;
   const valor = parseFloat(pago.descuentoValor) || 0;
-  if (pago.descuentoTipo === 'porcentaje') return totalBase * valor / 100;
+  const base = Math.max(0, parseFloat(pago.monto) || 0);
+  if (!base) return 0;
+  if (pago.descuentoTipo === 'porcentaje') return base * valor / 100;
   if (pago.descuentoTipo === 'fijo') return valor;
   return 0;
 };
@@ -35,31 +38,53 @@ export const CarritoVentas = ({
   error,
   tiposDescuento,
   tipoDescuento,
-  pesoActual,
-  conectandoBalanza,
   onChangeTipoDescuento,
   onAbrirModalTipoDesc,
   onCambiarCantidad,
   onCambiarPeso,
+  onCambiarPrecioFV,
   onQuitarDelCarrito,
   onToggleNotaCredito,
   onPagoChange,
   onDescuentoTipo,
-  onDescuento10,
   onMontoBlur,
   onAgregarMetodoPago,
   onQuitarMetodoPago,
   onObservacionChange,
   onImprimirAFavor,
   onRealizarVenta,
-  onConectarBalanza,
   notaCreditoOriginal,
   mostrarInputNC,
   notaCreditoDescuento,
   sobranteNC,
   onNotaCreditoChange,
   onToggleInputNC,
+  montoToFixIndex,
+  onFixMontoClick,
 }) => {
+  const [pesoEditId, setPesoEditId] = useState(null);
+  const [pesoGrams, setPesoGrams] = useState(0);
+
+  const handlePesoKeyDown = (e, itemId) => {
+    if (e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      setPesoGrams(prev => Math.min(prev * 10 + parseInt(e.key), 9999999));
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      setPesoGrams(prev => Math.floor(prev / 10));
+    } else if (e.key === 'Enter') {
+      onCambiarPeso(itemId, (pesoGrams / 1000) || 0.001);
+      setPesoEditId(null);
+    }
+  };
+
+  const handlePesoBlur = (itemId) => {
+    if (pesoEditId === itemId) {
+      onCambiarPeso(itemId, (pesoGrams / 1000) || 0.001);
+      setPesoEditId(null);
+    }
+  };
+
   return (
     <div>
       <h3 className="text-xl font-bold mb-4">Carrito</h3>
@@ -72,30 +97,46 @@ export const CarritoVentas = ({
         <EmptyState title="El carrito está vacío" icon="🛒" />
       ) : (
         <div className="bg-card p-4 rounded-lg shadow-sm border border-line mb-4">
-          {carrito.map((item, index) => {
-            const precio = esPesable(item.tipo) ? (item.precio || 0) * (item.peso || 0) : item.precio;
-            const itemKey = `${item.id}`;
+          {carrito.map((item) => {
+            const esFV = item.esFrutasVerduras;
+            const precio = esFV ? item.precio : (esPesable(item.tipo) ? (item.precio || 0) * (item.peso || 0) : item.precio);
+            const itemKey = `${item._key}`;
             return (
               <div key={itemKey} className={`py-2 border-b border-line ${item.esNotaCredito ? 'bg-red-soft -mx-4 px-4' : ''}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <p className={`font-semibold text-sm ${item.esNotaCredito ? 'text-red' : ''}`}>
-                      {item.esNotaCredito && '⚠️ '}{item.nombre}
+                      {esFV && '🍎 '}{item.esHuevos && '🥚 '}{item.esNotaCredito && '⚠️ '}{esFV ? 'Frutas y Verduras' : item.nombre}
                     </p>
                     <p className="text-xs text-muted">
-                      {esPesable(item.tipo)
-                        ? `$${formatNum(item.precio)} x ${Number(item.peso || 0).toFixed(3)}kg = $${formatNum(precio, 2)}`
-                        : `$${formatNum(precio)} x ${item.cantidad}`}
+                      {esFV
+                        ? `Total del ticket de balanza`
+                        : esPesable(item.tipo)
+                          ? `$${formatNum(item.precio)} x ${Number(item.peso || 0).toFixed(3)}kg = $${formatNum(precio, 2)}`
+                          : `$${formatNum(precio)} x ${item.cantidad}`}
                     </p>
                   </div>
-                  {esPesable(item.tipo) ? (
+                  {esFV ? (
                     <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted">$</span>
                       <input
                         type="number"
-                        min="0.001"
-                        step="0.001"
-                        value={Number(item.peso || 0).toFixed(3)}
-                        onChange={(e) => onCambiarPeso(item.id, parseFloat(e.target.value) || 0.001)}
+                        min="0"
+                        step="0.01"
+                        value={item.precio}
+                        onChange={(e) => onCambiarPrecioFV(item._key, e.target.value)}
+                        className="w-20 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
+                      />
+                    </div>
+                  ) : esPesable(item.tipo) ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={pesoEditId === item._key ? (pesoGrams / 1000).toFixed(3) : Number(item.peso || 0).toFixed(3)}
+                        onFocus={() => { setPesoEditId(item._key); setPesoGrams(Math.round((item.peso || 0) * 1000)); }}
+                        onKeyDown={(e) => handlePesoKeyDown(e, item._key)}
+                        onBlur={() => handlePesoBlur(item._key)}
                         className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
                       />
                       <span className="text-xs text-muted">kg</span>
@@ -103,14 +144,14 @@ export const CarritoVentas = ({
                   ) : (
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => onCambiarCantidad(item.id, item.cantidad - 1)}
+                        onClick={() => onCambiarCantidad(item._key, item.cantidad - 1)}
                         className="text-muted hover:text-body"
                       >
                         -
                       </button>
                       <span className="text-sm">{item.cantidad}</span>
                       <button
-                        onClick={() => onCambiarCantidad(item.id, item.cantidad + 1)}
+                        onClick={() => onCambiarCantidad(item._key, item.cantidad + 1)}
                         className="text-muted hover:text-body"
                       >
                         +
@@ -118,16 +159,16 @@ export const CarritoVentas = ({
                     </div>
                   )}
                   <button
-                    onClick={() => onQuitarDelCarrito(item.id)}
+                    onClick={() => onQuitarDelCarrito(item._key)}
                     className="text-red hover:text-red ml-2"
                   >
                     ✕
                   </button>
                 </div>
-                {!esPesable(item.tipo) && (
+                {!esPesable(item.tipo) && !esFV && (
                   <div className="mt-1 flex items-center justify-end">
                     <button
-                      onClick={() => onToggleNotaCredito(item.id)}
+                      onClick={() => onToggleNotaCredito(item._key)}
                       className={`text-xs px-2 py-0.5 rounded border ${item.esNotaCredito ? 'bg-red-600 text-white border-red-600' : 'bg-elevated text-secondary border-line'}`}
                     >
                       {item.esNotaCredito ? 'Nota Crédito' : 'Venta'}
@@ -139,6 +180,15 @@ export const CarritoVentas = ({
           })}
 
           <div className="mt-4 pt-4 border-t border-line">
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={onToggleInputNC}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${mostrarInputNC ? 'bg-purple-600 text-white border-purple-600' : 'bg-elevated text-secondary border-line'}`}
+              >
+                {mostrarInputNC ? '✕ Quitar NC' : '➕ Nota Crédito'}
+              </button>
+            </div>
+
             {totalNotaCredito > 0 && (
               <div className="text-sm mb-2">
                 <p className="text-red">Nota Crédito: -${formatNum(totalNotaCredito)}</p>
@@ -164,6 +214,29 @@ export const CarritoVentas = ({
             <p className="text-xl font-bold">Total: ${formatNum(total)}</p>
           </div>
 
+          {mostrarInputNC && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="number"
+                value={notaCreditoOriginal}
+                onChange={(e) => onNotaCreditoChange(e.target.value)}
+                className="w-32 border border-line-input bg-input text-body rounded p-2 text-sm text-right"
+                placeholder="Monto NC"
+              />
+              <span className="text-sm text-secondary">del comprobante</span>
+              {notaCreditoDescuento > 0 && (
+                <span className="text-sm text-purple font-semibold">
+                  -${notaCreditoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                </span>
+              )}
+              {sobranteNC > 0 && (
+                <span className="text-sm text-green font-semibold">
+                  Sobrante: ${sobranteNC.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                </span>
+              )}
+            </div>
+          )}
+
           {totalNotaCredito > 0 && (
             <div className="mt-4">
               <label className="block text-sm font-semibold mb-1">Observación / Motivo</label>
@@ -183,7 +256,7 @@ export const CarritoVentas = ({
         <div className="bg-card p-4 rounded-lg shadow-sm border border-line mb-4">
           <h4 className="font-semibold mb-2">Métodos de Pago</h4>
           {pagosSeleccionados.map((pago, idx) => {
-            const desc = calcularDescuento(pago, diferencia);
+            const desc = calcularDescuento(pago);
             const montoReal = Math.max(0, (parseFloat(pago.monto) || 0) - desc);
             return (
               <div key={idx} className="flex gap-1 mb-1.5 items-center">
@@ -191,9 +264,10 @@ export const CarritoVentas = ({
                   value={pago.metodo}
                   onChange={(e) => onPagoChange(idx, 'metodo', e.target.value)}
                   className="w-24 border border-line-input bg-input text-body rounded px-1.5 py-1 text-xs"
+                  translate="no"
                 >
                   {METODOS_PAGO.map(m => (
-                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                    <option key={m.id} value={m.id} translate="no">{m.nombre}</option>
                   ))}
                 </select>
                 <input
@@ -201,7 +275,8 @@ export const CarritoVentas = ({
                   value={pago.monto}
                   onChange={(e) => onPagoChange(idx, 'monto', e.target.value)}
                   onBlur={() => onMontoBlur(idx)}
-                  className="w-16 border border-line-input bg-input text-body rounded px-1.5 py-1 text-xs text-right"
+                  onClick={() => onFixMontoClick(idx)}
+                  className={`w-16 border rounded px-1.5 py-1 text-xs text-right ${montoToFixIndex === idx ? 'border-red bg-red-soft text-red' : 'border-line-input bg-input text-body'}`}
                   placeholder="0"
                 />
                 <input
@@ -220,8 +295,8 @@ export const CarritoVentas = ({
                   %
                 </button>
                 <button
-                  onClick={() => onDescuento10(idx)}
-                  className={`px-1.5 py-1 text-xs font-bold rounded border leading-none ${pago.descuentoTipo === 'porcentaje' && pago.descuentoValor == 10 ? 'bg-blue-600 text-white border-blue-600' : 'bg-elevated text-secondary border-line'}`}
+                  onClick={() => onDescuentoTipo(idx, '10pct')}
+                  className={`px-1.5 py-1 text-xs font-bold rounded border leading-none ${pago.descuentoTipo === 'porcentaje' && pago.descuentoValor == 10 ? 'bg-green-600 text-white border-green-600' : 'bg-elevated text-secondary border-line'}`}
                   title="10% de descuento"
                 >
                   10%
@@ -251,37 +326,6 @@ export const CarritoVentas = ({
           >
             + Agregar método de pago
           </button>
-
-          <div className="mt-3 pt-3 border-t border-line">
-            <button
-              onClick={onToggleInputNC}
-              className={`text-sm px-3 py-1.5 rounded font-semibold border ${mostrarInputNC ? 'bg-purple-600 text-white border-purple-600' : 'bg-elevated text-secondary border-line'}`}
-            >
-              {mostrarInputNC ? '✕ Quitar Ticket NC' : '➕ Ticket Nota de Crédito'}
-            </button>
-            {mostrarInputNC && (
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="number"
-                  value={notaCreditoOriginal}
-                  onChange={(e) => onNotaCreditoChange(e.target.value)}
-                  className="w-32 border border-line-input bg-input text-body rounded p-2 text-sm text-right"
-                  placeholder="Monto NC"
-                />
-                <span className="text-sm text-secondary">del comprobante</span>
-                {notaCreditoDescuento > 0 && (
-                  <span className="text-sm text-purple font-semibold">
-                    -${notaCreditoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                  </span>
-                )}
-                {sobranteNC > 0 && (
-                  <span className="text-sm text-green font-semibold">
-                    Sobrante: ${sobranteNC.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
 
           {totalDescuentos > 0 && (
             <div className="mt-3 pt-3 border-t border-line">
@@ -316,31 +360,17 @@ export const CarritoVentas = ({
                   <p className="text-sm text-purple">NC aplicada: -${notaCreditoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
                 )}
                 <p className="text-sm font-semibold">Total a pagar: ${totalConDescuento.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</p>
-                <p className={`text-sm ${totalPagos === totalConDescuento ? 'text-green' : 'text-red'}`}>
+                <p className={`text-sm ${Math.abs(totalPagos - total) < 0.01 ? 'text-green' : 'text-red'}`}>
                   Pagos: ${totalPagos.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                {pesoActual !== null && (
-                  <span className="text-sm font-semibold text-amber">
-                    ⚖️ Peso: {pesoActual} kg
-                  </span>
-                )}
-                <button
-                  onClick={onConectarBalanza}
-                  disabled={conectandoBalanza}
-                  className="text-xs px-2 py-1 rounded border bg-elevated text-secondary border-line hover:bg-card disabled:opacity-50"
-                >
-                  {conectandoBalanza ? 'Conectando...' : '🔗 Balanza'}
-                </button>
               </div>
-            </div>
             <button
               onClick={onRealizarVenta}
-              disabled={vendiendo || !caja || totalPagos !== totalConDescuento}
+              disabled={vendiendo || !caja || Math.abs(totalPagos - total) > 0.01}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
             >
-              {vendiendo ? 'Vendiendo...' : '💵 Vender'}
+              {vendiendo ? 'Vendiendo...' : '💵 Cobrar'}
             </button>
           </div>
         </div>

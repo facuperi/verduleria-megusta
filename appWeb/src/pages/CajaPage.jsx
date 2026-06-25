@@ -10,7 +10,7 @@ import { Modal } from '../components/Modal';
 import { ResumenCaja } from '../components/ResumenCaja';
 import { HistorialMovimientos } from '../components/HistorialMovimientos';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import { getDireccion, TELEFONO } from '../utils/ticketPrinter';
+import { getDireccion, TELEFONO } from '../utils/constants';
 import { formatNum } from '../utils/format';
 
 const TIPOS_RETIRO_FIJOS = [
@@ -84,6 +84,10 @@ export const CajaPage = () => {
   // Saldo anterior (última caja cerrada)
   const [saldoAnterior, setSaldoAnterior] = useState(null);
   const [mostrarPromptAnterior, setMostrarPromptAnterior] = useState(false);
+
+  // Filas expandibles en historial
+  const [filasExpandidas, setFilasExpandidas] = useState({});
+  const toggleFila = (id) => setFilasExpandidas(prev => ({ ...prev, [id]: !prev[id] }));
 
   // Editar venta
   const [editandoVenta, setEditandoVenta] = useState(null);
@@ -222,6 +226,7 @@ export const CajaPage = () => {
         ventasDebito: 0,
         ventasMercadoPago: 0,
         ventasCuentaDNI: 0,
+        sucursal: '',
       });
       setCaja({ 
         id: docRef.id, 
@@ -397,6 +402,7 @@ export const CajaPage = () => {
         usuarioNombre: user.email || 'Usuario',
         fecha: ahora.toISOString(),
         hora: ahora.toISOString(),
+        negocio: caja.sucursal || '',
       });
       
       // Actualizar efectivo en caja
@@ -698,17 +704,18 @@ const imprimirTicketCierre = () => {
     setProcesando(true);
     try {
       for (const item of (venta.productos || [])) {
-        if (!item.productoId) continue;
+        if (!item.productoId || item.esFrutasVerduras) continue;
         const productoRef = doc(db, 'productos', item.productoId);
         const productoDoc = await getDoc(productoRef);
         if (!productoDoc.exists()) continue;
 
         const productoData = productoDoc.data();
         const stockActual = productoData.stock || 0;
-        const cambioStock = item.esNotaCredito ? -item.cantidad : item.cantidad;
+        const esKg = item.peso !== undefined;
+        const cambioStock = item.esNotaCredito ? (esKg ? -(item.peso || 0) : -(item.cantidad || 0)) : (esKg ? (item.peso || 0) : (item.cantidad || 0));
 
         await updateDoc(productoRef, {
-          stock: stockActual + cambioStock,
+          stock: Math.max(-999999, stockActual + cambioStock),
         });
       }
 
@@ -906,7 +913,7 @@ const imprimirTicketCierre = () => {
 
           <div className="bg-card p-6 rounded-lg shadow-sm border border-line">
             <h3 className="text-xl font-semibold mb-4">Historial de Movimientos</h3>
-            <HistorialMovimientos ventasHoy={ventasHoy} retiros={retiros} ingresos={ingresos} isGerente={isGerente} TIPOS_RETIRO_FIJOS={TIPOS_RETIRO_FIJOS} tiposRetiroPersonalizados={tiposRetiroPersonalizados} TIPOS_INGRESO_FIJOS={TIPOS_INGRESO_FIJOS} tiposIngresoPersonalizados={tiposIngresoPersonalizados} handleOpenEdit={handleOpenEdit} handleEliminarVenta={handleEliminarVenta} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} efectivoCaja={efectivoCaja} />
+            <HistorialMovimientos ventasHoy={ventasHoy} retiros={retiros} ingresos={ingresos} isGerente={isGerente} TIPOS_RETIRO_FIJOS={TIPOS_RETIRO_FIJOS} tiposRetiroPersonalizados={tiposRetiroPersonalizados} TIPOS_INGRESO_FIJOS={TIPOS_INGRESO_FIJOS} tiposIngresoPersonalizados={tiposIngresoPersonalizados} handleOpenEdit={handleOpenEdit} handleEliminarVenta={handleEliminarVenta} ventasBrutas={ventasBrutas} notaCreditoTotal={notaCreditoTotal} efectivoCaja={efectivoCaja} filasExpandidas={filasExpandidas} toggleFila={toggleFila} />
           </div>
         </div>
       )}

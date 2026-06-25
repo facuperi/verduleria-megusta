@@ -1,3 +1,4 @@
+import React from 'react';
 import { formatNum } from '../utils/format';
 
 const TIPOS_RETIRO_FIJOS = [

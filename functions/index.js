@@ -7,7 +7,7 @@ const AFIP_AUTH_URL = 'https://app.afipsdk.com/api/v1/afip/auth';
 const AFIP_REQUEST_URL = 'https://app.afipsdk.com/api/v1/afip/requests';
 
 const calcularIva = (total) => {
-  const neto = Math.round(total / 1.21 * 100) / 100;
+  const neto = Math.round(total / 1.105 * 100) / 100;
   const iva = Math.round((total - neto) * 100) / 100;
   return { neto, iva };
 };
@@ -100,7 +100,7 @@ const crearFacturaAfip = async (token, sign, numeroFactura, total, tipoFactura, 
               MonId: 'PES',
               MonCotiz: 1,
               CondicionIVAReceptorId: condicionIva,
-              Iva: { AlicIva: [{ Id: 5, BaseImp: neto, Importe: iva }] }
+              Iva: { AlicIva: [{ Id: 4, BaseImp: neto, Importe: iva }] }
             }]
           }
         }
@@ -117,7 +117,10 @@ const crearFacturaAfip = async (token, sign, numeroFactura, total, tipoFactura, 
       numero: numeroFactura,
       tipoFactura,
       neto,
-      iva
+      iva,
+      cbteTipo,
+      docTipo,
+      docNro
     };
   }
 
@@ -179,7 +182,10 @@ exports.facturarVenta = functions.https.onRequest({
         cae: ventaDoc.data().cae,
         numero: ventaDoc.data().facturaNumero,
         fechaVto: ventaDoc.data().facturaFechaVto,
-        tipoFactura: ventaDoc.data().facturaTipo
+        tipoFactura: ventaDoc.data().facturaTipo,
+        cbteTipo: ventaDoc.data().facturaCbteTipo,
+        docTipo: ventaDoc.data().facturaDocCliente ? 80 : 99,
+        docNro: ventaDoc.data().facturaDocCliente ? parseInt(ventaDoc.data().facturaDocCliente) : 0
       });
     }
 
@@ -210,7 +216,10 @@ exports.facturarVenta = functions.https.onRequest({
       fechaVto: resultado.fechaVto,
       tipoFactura: resultado.tipoFactura,
       neto: resultado.neto,
-      iva: resultado.iva
+      iva: resultado.iva,
+      cbteTipo: resultado.cbteTipo,
+      docTipo: resultado.docTipo,
+      docNro: resultado.docNro
     });
 
   } catch (error) {

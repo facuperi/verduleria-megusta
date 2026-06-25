@@ -1,6 +1,8 @@
+import React from 'react';
 import { EmptyState } from './EmptyState';
+import { formatNum } from '../utils/format';
 
-export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, TIPOS_RETIRO_FIJOS, tiposRetiroPersonalizados, TIPOS_INGRESO_FIJOS, tiposIngresoPersonalizados, handleOpenEdit, handleEliminarVenta, ventasBrutas, notaCreditoTotal, efectivoCaja }) => {
+export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, TIPOS_RETIRO_FIJOS, tiposRetiroPersonalizados, TIPOS_INGRESO_FIJOS, tiposIngresoPersonalizados, handleOpenEdit, handleEliminarVenta, ventasBrutas, notaCreditoTotal, efectivoCaja, filasExpandidas, toggleFila }) => {
   if (ventasHoy.length === 0 && retiros.length === 0 && ingresos.length === 0) {
     return <EmptyState title="No hay movimientos aún" />;
   }
@@ -10,6 +12,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, 
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line">
+            <th className="text-left py-2"></th>
             <th className="text-left py-2">Hora</th>
             <th className="text-left py-2">Tipo</th>
             <th className="text-left py-2">Monto</th>
@@ -26,6 +29,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, 
                 const tipoRetiro = TIPOS_RETIRO_FIJOS.find(t => t.id === item.tipo) || tiposRetiroPersonalizados.find(t => t.id === item.tipo);
                 return (
                   <tr key={item.id} className="border-b border-line bg-orange-soft">
+                    <td className="py-2 pr-1"></td>
                     <td className="py-2 whitespace-nowrap text-body">
                       {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </td>
@@ -48,6 +52,7 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, 
                 const tipoIngreso = TIPOS_INGRESO_FIJOS.find(t => t.id === item.tipo) || tiposIngresoPersonalizados.find(t => t.id === item.tipo);
                 return (
                   <tr key={item.id} className="border-b border-line bg-green-soft">
+                    <td className="py-2 pr-1"></td>
                     <td className="py-2 whitespace-nowrap text-body">
                       {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </td>
@@ -74,62 +79,141 @@ export const HistorialMovimientos = ({ ventasHoy, retiros, ingresos, isGerente, 
               const tipoLabel = esNotaCredito
                 ? (esMixta ? 'Mixta (NC)' : 'Nota Crédito')
                 : (esMixta ? 'Mixta' : 'Venta');
+              const expandida = filasExpandidas?.[item.id];
 
               return (
-                <tr key={item.id} className={`border-b border-line ${esNotaCredito ? 'bg-red-soft' : 'bg-green-soft'}`}>
-                  <td className="py-2 whitespace-nowrap">
-                    {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                  </td>
-                  <td className="py-2">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      esNotaCredito ? 'bg-red-soft text-red' : 'bg-green-soft text-green'
-                    }`}>
-                      {esNotaCredito ? '⬇️' : '⬆️'} {tipoLabel}
-                    </span>
-                  </td>
-                  <td className={`py-2 font-bold ${esNotaCredito ? 'text-red' : 'text-green'}`}>
-                    {esNotaCredito && <span className="text-red mr-1">-</span>}
-                    ${montoMostrar.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                  </td>
-                  <td className="py-2 text-secondary">
-                    {item.tipoPago?.map(p => {
-                      const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP', cuentadni: 'DNI' };
-                      return nombres[p] || p;
-                    }).join(', ') || '-'}
-                    {(() => {
-                      const base = item.diferencia > 0 ? item.diferencia : item.total || 0;
-                      const descTotal = item.pagos?.reduce((s, pg) => {
-                        if (!pg.descuentoTipo || !pg.descuentoValor) return s;
-                        return s + (pg.descuentoTipo === 'porcentaje' ? base * pg.descuentoValor / 100 : pg.descuentoValor);
-                      }, 0) || 0;
-                      const parts = [];
-                      if (descTotal > 0) parts.push(`Desc: -${descTotal.toLocaleString('es-AR')}`);
-                      if (item.notaCreditoDescuento) parts.push(`NC: -${item.notaCreditoDescuento.toLocaleString('es-AR')}`);
-                      if (item.tipoDescuento) parts.push(`[${item.tipoDescuento}]`);
-                      return parts.length > 0 ? <span className="text-green text-xs ml-1">({parts.join(' ')})</span> : null;
-                    })()}
-                  </td>
-                  <td className="py-2 text-muted max-w-xs truncate">{item.observacion || '-'}</td>
-                  {isGerente && (
-                    <td className="py-2 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="text-blue hover:text-blue mr-1 text-xs"
-                        title="Editar"
-                      >✏️</button>
-                      <button
-                        onClick={() => handleEliminarVenta(item)}
-                        className="text-red hover:text-red text-xs"
-                        title="Eliminar"
-                      >🗑️</button>
+                <React.Fragment key={item.id}>
+                  <tr className={`border-b border-line cursor-pointer hover:opacity-80 ${esNotaCredito ? 'bg-red-soft' : 'bg-green-soft'}`} onClick={() => toggleFila?.(item.id)}>
+                    <td className="py-2 pr-1">
+                      <button className="text-secondary hover:text-body text-xs">
+                        {expandida ? '▼' : '▶'}
+                      </button>
                     </td>
+                    <td className="py-2 whitespace-nowrap">
+                      {item.hora ? new Date(item.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                    </td>
+                    <td className="py-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        esNotaCredito ? 'bg-red-soft text-red' : 'bg-green-soft text-green'
+                      }`}>
+                        {esNotaCredito ? '⬇️' : '⬆️'} {tipoLabel}
+                      </span>
+                    </td>
+                    <td className={`py-2 font-bold ${esNotaCredito ? 'text-red' : 'text-green'}`}>
+                      {esNotaCredito && <span className="text-red mr-1">-</span>}
+                      ${montoMostrar.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                    </td>
+                    <td className="py-2 text-secondary">
+                      {item.tipoPago?.map(p => {
+                        const nombres = { efectivo: 'EF', tarjeta: 'TJ', debito: 'DB', mercadopago: 'MP', cuentadni: 'DNI' };
+                        return nombres[p] || p;
+                      }).join(', ') || '-'}
+                      {(() => {
+                        const base = item.diferencia > 0 ? item.diferencia : item.total || 0;
+                        const descTotal = item.pagos?.reduce((s, pg) => {
+                          if (!pg.descuentoTipo || !pg.descuentoValor) return s;
+                          return s + (pg.descuentoTipo === 'porcentaje' ? base * pg.descuentoValor / 100 : pg.descuentoValor);
+                        }, 0) || 0;
+                        const parts = [];
+                        if (descTotal > 0) parts.push(`Desc: -${descTotal.toLocaleString('es-AR')}`);
+                        if (item.notaCreditoDescuento) parts.push(`NC: -${item.notaCreditoDescuento.toLocaleString('es-AR')}`);
+                        if (item.tipoDescuento) parts.push(`[${item.tipoDescuento}]`);
+                        return parts.length > 0 ? <span className="text-green text-xs ml-1">({parts.join(' ')})</span> : null;
+                      })()}
+                    </td>
+                    <td className="py-2 text-muted max-w-xs truncate">{item.observacion || '-'}</td>
+                    {isGerente && (
+                      <td className="py-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(item); }}
+                          className="text-blue hover:text-blue mr-1 text-xs"
+                          title="Editar"
+                        >✏️</button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleEliminarVenta(item); }}
+                          className="text-red hover:text-red text-xs"
+                          title="Eliminar"
+                        >🗑️</button>
+                      </td>
+                    )}
+                  </tr>
+                  {expandida && (
+                    <tr key={`${item.id}-detalle`} className="border-t border-line bg-card">
+                      <td colSpan={isGerente ? 7 : 6} className="px-4 py-3">
+                        <div className="text-sm">
+                          <p className="font-semibold mb-2">Detalle de la venta:</p>
+                          {item.productos && (
+                            <table className="w-full text-sm mb-2">
+                              <thead>
+                                <tr className="text-left border-b border-line">
+                                  <th className="py-1">Producto</th>
+                                  <th className="py-1">Cantidad</th>
+                                  <th className="py-1">Precio</th>
+                                  <th className="py-1">Subtotal</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.productos.map((p, idx) => (
+                                  <tr key={idx} className="border-b border-line">
+                                    <td className="py-1">{p.nombre}</td>
+                                    <td className="py-1">{p.cantidad}{p.peso ? ` (${formatNum(p.peso, 3)} kg)` : ''}</td>
+                                    <td className="py-1">${formatNum(p.precio)}</td>
+                                    <td className="py-1">${(p.precio * (p.cantidad || p.peso || 1)).toLocaleString('es-AR')}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                          {item.notaCreditoDescuento > 0 && (
+                            <p className="text-xs ml-2 mb-1"><strong>NC redimida:</strong> -${item.notaCreditoDescuento.toLocaleString('es-AR')}</p>
+                          )}
+                          {item.notaCreditoOriginal > 0 && (
+                            <p className="text-xs ml-2 mb-1"><strong>Comp. original:</strong> ${item.notaCreditoOriginal.toLocaleString('es-AR')}</p>
+                          )}
+                          {item.nuevoSaldoFavor > 0 && (
+                            <p className="text-xs ml-2 mb-1"><strong>NC generada:</strong> ${item.nuevoSaldoFavor.toLocaleString('es-AR')}</p>
+                          )}
+                          {item.pagos && (
+                            <div className="mt-1">
+                              <p className="font-semibold text-xs mb-1">Métodos de pago:</p>
+                              {item.tipoDescuento && (
+                                <p className="text-xs ml-2 mb-1"><strong>Tipo de descuento:</strong> {item.tipoDescuento}</p>
+                              )}
+                              {item.pagos.map((pg, idx) => {
+                                const tieneDesc = pg.descuentoTipo && pg.descuentoValor > 0;
+                                const descEtiqueta = tieneDesc
+                                  ? (pg.descuentoTipo === 'porcentaje'
+                                    ? `${pg.descuentoValor}%`
+                                    : `$${pg.descuentoValor.toLocaleString('es-AR')}`)
+                                  : null;
+                                const descValor = tieneDesc
+                                  ? (pg.descuentoTipo === 'porcentaje'
+                                    ? (item.diferencia || item.total || 0) * pg.descuentoValor / 100
+                                    : pg.descuentoValor)
+                                  : 0;
+                                return (
+                                  <p key={idx} className="text-xs ml-2">
+                                    {pg.metodo}: ${(pg.monto || 0).toLocaleString('es-AR')}
+                                    {descValor > 0 && <span className="text-green"> ({descEtiqueta} desc s/$${(item.diferencia || item.total || 0).toLocaleString('es-AR')})</span>}
+                                  </p>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {item.observacion && (
+                            <p className="mt-1 text-xs"><strong>Observación:</strong> {item.observacion}</p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </tr>
+                </React.Fragment>
               );
             })}
         </tbody>
         <tfoot className="bg-table-header font-semibold">
           <tr>
+            <td className="py-2"></td>
             <td className="py-2 pl-2">TOTALES</td>
             <td className="py-2"></td>
             <td className="py-2">

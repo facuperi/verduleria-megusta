@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const TIPOS_RETIRO = [
   { id: 'cajaRoja', nombre: 'Caja roja', icono: '💰' },
@@ -22,10 +22,6 @@ const TIPOS_MOVIMIENTO = [
   { id: 'cierre', nombre: 'Cierre de Caja' },
 ];
 
-const NEGOCIOS = [
-  { id: 'todos', nombre: 'Todos' },
-];
-
 const METODOS_PAGO = [
   { id: 'todos', nombre: 'Todos' },
   { id: 'efectivo', nombre: 'Efectivo' },
@@ -38,7 +34,6 @@ const METODOS_PAGO = [
 export const FiltrosReportes = ({
   fechaDesde, setFechaDesde,
   fechaHasta, setFechaHasta,
-  negocio, setNegocio,
   tipoMovimiento, setTipoMovimiento,
   tipoRetiro, setTipoRetiro,
   tipoIngreso, setTipoIngreso,
@@ -46,14 +41,19 @@ export const FiltrosReportes = ({
   facturaFilter, setFacturaFilter,
   productosSeleccionados, toggleProducto, limpiarProductos,
   busquedaProducto, setBusquedaProducto,
-  mostrarSelectorProductos, setMostrarSelectorProductos,
   productos,
   cargarMovimientos, loading,
   movimientosFiltrados, exportarExcel,
+  scanError,
+  flashGreenId,
+  filtroActivo, setFiltroActivo,
+  filtrosUnicos,
 }) => {
+  const [mostrarSelectorProductos, setMostrarSelectorProductos] = useState(false);
   const productosFiltrados = productos.filter(p =>
-    p.nombre?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-    p.codigoBarras?.toLowerCase().includes(busquedaProducto.toLowerCase())
+    (p.nombre?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
+     p.codigoBarras?.toLowerCase().includes(busquedaProducto.toLowerCase())) &&
+    (filtroActivo === 'todos' || p.filtro === filtroActivo)
   );
 
   return (
@@ -76,18 +76,6 @@ export const FiltrosReportes = ({
             onChange={(e) => setFechaHasta(e.target.value)}
             className="w-full border border-line-input bg-input text-body p-2 rounded"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold mb-1">Negocio</label>
-          <select
-            value={negocio}
-            onChange={(e) => setNegocio(e.target.value)}
-            className="w-full border border-line-input bg-input text-body p-2 rounded"
-          >
-            {NEGOCIOS.map(n => (
-              <option key={n.id} value={n.id}>{n.nombre}</option>
-            ))}
-          </select>
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1">Tipo Movimiento</label>
@@ -165,11 +153,40 @@ export const FiltrosReportes = ({
         )}
 
         {tipoMovimiento === 'ventasNC' && (
-          <div className="md:col-span-2 relative">
+          <div className="md:col-span-6 relative">
             <label className="block text-sm font-semibold mb-1">
               Productos {productosSeleccionados.length > 0 && `(${productosSeleccionados.length} seleccionados)`}
             </label>
-            <div className="flex gap-2">
+
+            {filtrosUnicos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button
+                  onClick={() => setFiltroActivo('todos')}
+                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                    filtroActivo === 'todos'
+                      ? 'bg-amber text-white'
+                      : 'bg-elevated text-secondary hover:bg-amber-soft/30'
+                  }`}
+                >
+                  Todos
+                </button>
+                {filtrosUnicos.map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltroActivo(f)}
+                    className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                      filtroActivo === f
+                        ? 'bg-amber text-white'
+                        : 'bg-elevated text-secondary hover:bg-amber-soft/30'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-2">
               <div className="flex-1 relative">
                 <input
                   type="text"
@@ -246,6 +263,17 @@ export const FiltrosReportes = ({
                     </span>
                   ) : null;
                 })}
+              </div>
+            )}
+
+            {scanError && (
+              <div className="mt-2 p-2 bg-red-soft text-red text-sm rounded flex items-center gap-1 font-semibold">
+                ⚠️ Código <strong>{scanError}</strong> no encontrado
+              </div>
+            )}
+            {flashGreenId && (
+              <div className="mt-2 p-2 bg-green-soft text-green text-sm rounded font-semibold">
+                ✅ Producto agregado al filtro
               </div>
             )}
           </div>
