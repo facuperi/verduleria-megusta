@@ -27,6 +27,7 @@ const METODOS_PAGO = [
   { id: 'debito', nombre: 'Débito' },
   { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
+  { id: 'deuda', nombre: 'Deuda' },
 ];
 
 const calcularIva = (total) => {
@@ -132,6 +133,12 @@ export const VentasPage = () => {
   const [mostrarModalLenaCarbon, setMostrarModalLenaCarbon] = useState(false);
   const [filtroActivo, setFiltroActivo] = useState('todos');
   const [ordenActivo, setOrdenActivo] = useState('default');
+
+  // Clientes para pagos con deuda
+  const [clientes, setClientes] = useState([]);
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [showSelectorCliente, setShowSelectorCliente] = useState(false);
+  const [pagoIndexConDeuda, setPagoIndexConDeuda] = useState(null);
 
   const esPesable = (tipo) => tipo === 'pesable' || tipo === 'pesableConStock';
 
@@ -241,6 +248,10 @@ export const VentasPage = () => {
         } else {
           setTiposDescuento(tiposDescData);
         }
+
+        // Cargar clientes para pago con deuda
+        const clientesSnapshot = await getDocs(collection(db, 'clientes'));
+        setClientes(clientesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
         setError('Error al cargar datos');
       } finally {
@@ -463,7 +474,16 @@ export const VentasPage = () => {
       nuevosPagos[index] = {
         ...nuevosPagos[index],
         metodo: valor,
+        clienteId: undefined,
+        clienteNombre: undefined,
       };
+      if (valor === 'deuda') {
+        setPagosSeleccionados(nuevosPagos);
+        setPagoIndexConDeuda(index);
+        setShowSelectorCliente(true);
+        setBusquedaCliente('');
+        return;
+      }
     } else if (campo === 'monto') {
       const val = parseFloat(valor) || 0;
       nuevosPagos[index] = { ...nuevosPagos[index], monto: val };
@@ -535,6 +555,26 @@ export const VentasPage = () => {
       autoAjustarMontos(nuevosPagos);
       setPagosSeleccionados(nuevosPagos);
     }
+  };
+
+  const seleccionarClienteParaDeuda = (index) => {
+    setPagoIndexConDeuda(index);
+    setShowSelectorCliente(true);
+    setBusquedaCliente('');
+  };
+
+  const handleSeleccionarCliente = (cliente) => {
+    const nuevosPagos = [...pagosSeleccionados];
+    if (pagoIndexConDeuda !== null && nuevosPagos[pagoIndexConDeuda]) {
+      nuevosPagos[pagoIndexConDeuda] = {
+        ...nuevosPagos[pagoIndexConDeuda],
+        clienteId: cliente.id,
+        clienteNombre: cliente.nombre,
+      };
+      setPagosSeleccionados(nuevosPagos);
+    }
+    setShowSelectorCliente(false);
+    setPagoIndexConDeuda(null);
   };
 
   const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
@@ -615,9 +655,26 @@ export const VentasPage = () => {
     }
     if (carrito.length === 0) return;
     
-    if (Math.abs(totalPagos - total) > 0.01) {
-      setError(`Los pagos suman $${totalPagos} pero el total de venta es $${total}`);
+    // Validar total de pagos (excluyendo deuda)
+    const montoDeuda = pagosSeleccionados
+      .filter(p => p.metodo === 'deuda')
+      .reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
+    const montoCobrado = total - montoDeuda;
+    const totalPagosSinDeuda = pagosSeleccionados
+      .filter(p => p.metodo !== 'deuda')
+      .reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
+    if (Math.abs(totalPagosSinDeuda - montoCobrado) > 0.01) {
+      setError(`Los pagos suman $${totalPagosSinDeuda} pero el total de venta es $${montoCobrado}`);
       return;
+    }
+
+    // Validar que los pagos con deuda tengan cliente seleccionado
+    for (const pago of pagosSeleccionados) {
+      if (pago.metodo === 'deuda' && !pago.clienteId) {
+        setError('Seleccioná un cliente para el pago con Deuda');
+        setVendiendo(false);
+        return;
+      }
     }
 
     setVendiendo(true);
@@ -648,10 +705,10 @@ export const VentasPage = () => {
 
       const ventaDoc = await addDoc(collection(db, 'ventas'), {
         productos: productosVenta,
-        total: totalConDescuento,
+        total: montoCobrado,
         totalVenta,
         totalNotaCredito,
-        diferencia,
+        diferencia: montoCobrado,
         tipoVenta,
         observacion: observacion || null,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
@@ -674,6 +731,10 @@ export const VentasPage = () => {
         fecha: serverTimestamp(),
         hora: ahora.toISOString(),
         tipoDescuento: totalDescuentos > 0 && tipoDescuento ? tipoDescuento : null,
+        ...(() => {
+          const pagoDeuda = pagosSeleccionados.find(p => p.metodo === 'deuda' && p.clienteId);
+          return pagoDeuda ? { clienteId: pagoDeuda.clienteId, clienteNombre: pagoDeuda.clienteNombre, montoDeuda: parseFloat(pagoDeuda.monto) || 0 } : {};
+        })(),
       });
 
       // Actualizar stock
@@ -743,6 +804,20 @@ export const VentasPage = () => {
         await updateDoc(doc(db, 'caja', caja.id), updateData);
       }
 
+      // Actualizar deuda del cliente
+      const pagoDeuda = pagosSeleccionados.find(p => p.metodo === 'deuda' && p.clienteId);
+      if (pagoDeuda) {
+        const montoDeuda = parseFloat(pagoDeuda.monto) || 0;
+        if (montoDeuda > 0) {
+          const clienteRef = doc(db, 'clientes', pagoDeuda.clienteId);
+          const clienteDoc = await getDoc(clienteRef);
+          if (clienteDoc.exists()) {
+            const deudaActual = clienteDoc.data().deuda || 0;
+            await updateDoc(clienteRef, { deuda: deudaActual + montoDeuda });
+          }
+        }
+      }
+
       // Recargar datos
       const productosActualizados = await getDocs(collection(db, 'productos'));
       setProductos(productosActualizados.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -770,14 +845,19 @@ export const VentasPage = () => {
       });
       const nuevaVenta = {
         id: ventaDoc.id,
-        total: totalConDescuento,
-        subtotal: diferencia,
+        total: montoCobrado,
+        subtotal: montoCobrado,
         productos: productosVenta,
         tipoPago: pagosSeleccionados.map(p => p.metodo),
         pagos: pagosConDescuento,
         tipoVenta,
+        montoDeuda: montoDeuda > 0 ? montoDeuda : undefined,
         notaCreditoDescuento: notaCreditoDescuento > 0 ? notaCreditoDescuento : undefined,
         nuevoSaldoFavor: saldoFavorTotal > 0 ? saldoFavorTotal : undefined,
+        ...(() => {
+          const pagoDeuda = pagosSeleccionados.find(p => p.metodo === 'deuda' && p.clienteId);
+          return pagoDeuda ? { clienteId: pagoDeuda.clienteId, clienteNombre: pagoDeuda.clienteNombre } : {};
+        })(),
       };
       setVentaExitosa(nuevaVenta);
       
@@ -976,6 +1056,7 @@ export const VentasPage = () => {
             onObservacionChange={setObservacion}
             onImprimirAFavor={() => imprimirTicketAFavor(diferencia, caja, user?.email)}
             onRealizarVenta={realizarVenta}
+            onSeleccionarCliente={seleccionarClienteParaDeuda}
             notaCreditoOriginal={notaCreditoOriginal}
             mostrarInputNC={mostrarInputNC}
             notaCreditoDescuento={notaCreditoDescuento}
@@ -986,6 +1067,34 @@ export const VentasPage = () => {
               setMostrarInputNC(!mostrarInputNC);
             }}
           />
+
+          {/* Selector de cliente para pago con deuda */}
+          <Modal open={showSelectorCliente} onClose={() => { setShowSelectorCliente(false); setPagoIndexConDeuda(null); }} title="Seleccionar Cliente" className="max-w-sm">
+            <input
+              type="text"
+              value={busquedaCliente}
+              onChange={(e) => setBusquedaCliente(e.target.value)}
+              placeholder="Buscar cliente..."
+              className="w-full border border-line-input bg-input text-body rounded px-3 py-2 mb-3"
+              autoFocus
+            />
+            <div className="max-h-60 overflow-y-auto">
+              {clientes
+                .filter(c => c.nombre.toLowerCase().includes(busquedaCliente.toLowerCase()))
+                .map(cliente => (
+                  <button
+                    key={cliente.id}
+                    onClick={() => handleSeleccionarCliente(cliente)}
+                    className="w-full text-left px-3 py-2 hover:bg-elevated rounded transition-colors border-b border-line last:border-b-0"
+                  >
+                    <span className="font-medium">{cliente.nombre}</span>
+                  </button>
+                ))}
+              {clientes.length === 0 && (
+                <p className="text-muted text-sm text-center py-4">No hay clientes registrados</p>
+              )}
+            </div>
+          </Modal>
 
           <ModalPesarProducto
             producto={productoPesando}

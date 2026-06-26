@@ -404,7 +404,7 @@ export const ReportesPage = () => {
 
   // ==== PASO 4: Calcular resumen ====
   const ventasNormales = movimientosFiltrados
-    .filter(m => m.origen === 'ventas' && m.tipoVenta !== 'notaCredito' && !(m.tipoVenta === 'mixta' && m.diferencia < 0))
+    .filter(m => m.origen === 'ventas' && m.tipoVenta !== 'notaCredito' && m.tipoVenta !== 'pagoDeuda' && !(m.tipoVenta === 'mixta' && m.diferencia < 0))
     .reduce((sum, m) => sum + (m.total || m.diferencia || 0), 0);
 
   const notasCredito = movimientosFiltrados
@@ -434,7 +434,15 @@ export const ReportesPage = () => {
     .filter(m => m.origen === 'ventas')
     .reduce((sum, m) => sum + (m.notaCreditoDescuento || 0), 0);
 
-  const balance = ventasNormales - notasCredito - notaCreditoDescuento + ingresosTotal - retirosTotal;
+  const ventasDeuda = movimientosFiltrados
+    .filter(m => m.origen === 'ventas' && m.montoDeuda > 0)
+    .reduce((sum, m) => sum + (m.montoDeuda || 0), 0);
+
+  const pagosDeuda = movimientosFiltrados
+    .filter(m => m.tipoVenta === 'pagoDeuda')
+    .reduce((sum, m) => sum + (m.total || 0), 0);
+
+  const balance = ventasNormales - notasCredito - notaCreditoDescuento + pagosDeuda + ingresosTotal - retirosTotal;
 
   // ==== PASO 8: Detalle expandible ====
   const toggleFila = (id) => {
@@ -608,7 +616,7 @@ export const ReportesPage = () => {
       />
 
       {movimientosFiltrados.length > 0 && (
-        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} notaCreditoDescuento={notaCreditoDescuento} retirosTotal={retirosTotal} ingresosTotal={ingresosTotal} totalDescuentos={totalDescuentos} balance={balance} />
+        <ResumenReportes ventasNormales={ventasNormales} notasCredito={notasCredito} notaCreditoDescuento={notaCreditoDescuento} retirosTotal={retirosTotal} ingresosTotal={ingresosTotal} totalDescuentos={totalDescuentos} ventasDeuda={ventasDeuda} pagosDeuda={pagosDeuda} balance={balance} />
       )}
 
       {movimientosFiltrados.length > 0 && (

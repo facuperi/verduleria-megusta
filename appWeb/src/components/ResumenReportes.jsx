@@ -1,8 +1,9 @@
-export const ResumenReportes = ({ ventasNormales, notasCredito, notaCreditoDescuento, retirosTotal, ingresosTotal, totalDescuentos, balance }) => {
+export const ResumenReportes = ({ ventasNormales, notasCredito, notaCreditoDescuento, retirosTotal, ingresosTotal, totalDescuentos, ventasDeuda, pagosDeuda, balance }) => {
+  const deudaPendiente = ventasDeuda - pagosDeuda;
   return (
-    <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-9 gap-4 mb-6">
       <div className="bg-green-soft p-4 rounded-lg border border-green-line">
-        <p className="text-sm text-green">Ventas Normales</p>
+        <p className="text-sm text-green">Ventas</p>
         <p className="text-2xl font-bold text-green">${ventasNormales.toLocaleString('es-AR')}</p>
       </div>
       <div className="bg-red-soft p-4 rounded-lg border border-red-line">
@@ -27,6 +28,18 @@ export const ResumenReportes = ({ ventasNormales, notasCredito, notaCreditoDescu
         <div className="bg-amber-soft p-4 rounded-lg border border-amber-line">
           <p className="text-sm text-amber">Descuentos</p>
           <p className="text-2xl font-bold text-amber">-${totalDescuentos.toLocaleString('es-AR')}</p>
+        </div>
+      )}
+      {pagosDeuda > 0 && (
+        <div className="bg-green-soft p-4 rounded-lg border border-green-line">
+          <p className="text-sm text-green">Pagos de deuda</p>
+          <p className="text-2xl font-bold text-green">+${pagosDeuda.toLocaleString('es-AR')}</p>
+        </div>
+      )}
+      {ventasDeuda > 0 && (
+        <div className="bg-purple-soft p-4 rounded-lg border border-purple-line">
+          <p className="text-sm text-purple">Deuda generada</p>
+          <p className="text-2xl font-bold text-purple">$${ventasDeuda.toLocaleString('es-AR')}</p>
         </div>
       )}
       <div className={`p-4 rounded-lg border ${balance >= 0 ? 'bg-blue-soft border-blue-line' : 'bg-card border-line'}`}>

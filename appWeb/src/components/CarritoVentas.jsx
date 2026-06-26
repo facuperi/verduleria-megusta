@@ -8,6 +8,7 @@ const METODOS_PAGO = [
   { id: 'debito', nombre: 'Débito' },
   { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
+  { id: 'deuda', nombre: 'Deuda' },
 ];
 
 const calcularDescuento = (pago) => {
@@ -61,6 +62,7 @@ export const CarritoVentas = ({
   onToggleInputNC,
   montoToFixIndex,
   onFixMontoClick,
+  onSeleccionarCliente,
 }) => {
   const [pesoEditId, setPesoEditId] = useState(null);
   const [pesoGrams, setPesoGrams] = useState(0);
@@ -312,6 +314,15 @@ export const CarritoVentas = ({
                   <span className="text-[10px] text-green font-semibold whitespace-nowrap">
                     -${montoReal.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                   </span>
+                )}
+                {pago.metodo === 'deuda' && (
+                  <button
+                    onClick={() => onSeleccionarCliente(idx)}
+                    className={`px-1.5 py-1 text-[10px] rounded border leading-none ${pago.clienteNombre ? 'bg-green text-white border-green' : 'bg-elevated text-secondary border-line'}`}
+                    title="Seleccionar cliente"
+                  >
+                    {pago.clienteNombre ? pago.clienteNombre : '👤'}
+                  </button>
                 )}
                 {pagosSeleccionados.length > 1 && (
                   <button onClick={() => onQuitarMetodoPago(idx)} className="text-red hover:text-red text-xs ml-0.5">✕</button>

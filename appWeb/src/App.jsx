@@ -14,6 +14,7 @@ const StockPage = lazy(() => import('./pages/StockPage'));
 const CajaPage = lazy(() => import('./pages/CajaPage'));
 const ReportesPage = lazy(() => import('./pages/ReportesPage'));
 const UsuariosPage = lazy(() => import('./pages/UsuariosPage'));
+const ClientesPage = lazy(() => import('./pages/ClientesPage'));
 
 const PrivateRoute = ({ children, requiredRole }) => {
   const { user, userRole, loading } = useAuth();
@@ -79,6 +80,11 @@ function App() {
                 <Route path="/usuarios" element={
                   <PrivateRoute requiredRole="gerente">
                     <UsuariosPage />
+                  </PrivateRoute>
+                } />
+                <Route path="/clientes" element={
+                  <PrivateRoute requiredRole="gerente">
+                    <ClientesPage />
                   </PrivateRoute>
                 } />
                 <Route path="/" element={<Navigate to="/login" />} />

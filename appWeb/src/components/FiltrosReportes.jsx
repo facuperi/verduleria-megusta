@@ -29,6 +29,7 @@ const METODOS_PAGO = [
   { id: 'debito', nombre: 'Débito' },
   { id: 'mercadopago', nombre: 'Mercado Pago' },
   { id: 'cuentadni', nombre: 'Cuenta DNI' },
+  { id: 'deuda', nombre: 'Deuda' },
 ];
 
 export const FiltrosReportes = ({

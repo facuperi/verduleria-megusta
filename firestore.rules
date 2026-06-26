@@ -76,5 +76,10 @@ service cloud.firestore {
       allow read: if isAuth();
       allow write: if isAuth();
     }
+    match /clientes/{clienteId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isGerente();
+    }
   }
 }
