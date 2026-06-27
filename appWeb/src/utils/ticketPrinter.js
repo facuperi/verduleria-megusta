@@ -249,7 +249,9 @@ ${nombre} ${item.cantidad.toString().padStart(3)} -${importe.padStart(5)}`;
   const totalFormateado = ventaExitosa.total.toLocaleString('es-AR', { minimumFractionDigits: 0 });
   const netoFormateado = neto.toLocaleString('es-AR', { minimumFractionDigits: 0 });
   const ivaFormateado = iva.toLocaleString('es-AR', { minimumFractionDigits: 0 });
-  const esSoloEfectivo = ventaExitosa.tipoPago?.every(m => m === 'efectivo');
+  const tieneDeuda = ventaExitosa.pagos?.some(p => p.metodo === 'deuda');
+  const esSoloEfectivo = (ventaExitosa.tipoPago?.every(m => m === 'efectivo'))
+    && !tieneDeuda;
 
   const descuentoTotal = subtotal - ventaExitosa.total;
   const descuentoPagos = descuentoTotal - (ventaExitosa.notaCreditoDescuento || 0);
