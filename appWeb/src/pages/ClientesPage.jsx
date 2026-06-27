@@ -179,7 +179,7 @@ export const ClientesPage = () => {
         totalVenta: 0,
         totalNotaCredito: 0,
         diferencia: monto,
-        pagos: [{ metodo: metodoPago, monto: parseFloat(montoPago) || 0 }],
+        pagos: [{ metodo: metodoPago, monto: monto }],
         tipoPago: [metodoPago],
         clienteId: clientePago.id,
         clienteNombre: clientePago.nombre,
@@ -426,7 +426,7 @@ export const ClientesPage = () => {
 
             {(clienteSeleccionado.deuda || 0) > 0 && (
               <button
-                onClick={() => { setClientePago(clienteSeleccionado); setMontoPago(''); setMetodoPago('efectivo'); setTipoFactura(null); setFacturaData(null); setFacturaError(''); setShowPagoModal(true); }}
+                onClick={() => { setClientePago(clienteSeleccionado); setMontoPagoCents(0); setMetodoPago('efectivo'); setTipoFactura(null); setFacturaData(null); setFacturaError(''); setShowPagoModal(true); }}
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mb-4 font-semibold"
               >
                 💰 Registrar pago

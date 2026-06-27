@@ -66,6 +66,17 @@ export const CarritoVentas = ({
 }) => {
   const [pesoEditId, setPesoEditId] = useState(null);
   const [pesoGrams, setPesoGrams] = useState(0);
+  const [editMontoIdx, setEditMontoIdx] = useState(null);
+  const [editMontoVal, setEditMontoVal] = useState('');
+
+  const parseSpanishNum = (str) => {
+    if (str === '' || str === '0') return 0;
+    return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+  };
+
+  const formatSpanishNum = (num) => {
+    return Number(num).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   const handlePesoKeyDown = (e, itemId) => {
     if (e.key >= '0' && e.key <= '9') {
@@ -275,19 +286,23 @@ export const CarritoVentas = ({
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={pago.monto}
+                  value={editMontoIdx === idx ? editMontoVal : (pago.monto === '' || pago.monto === 0 ? '' : formatSpanishNum(pago.monto))}
+                  onFocus={() => {
+                    setEditMontoIdx(idx);
+                    setEditMontoVal(pago.monto === '' || pago.monto === 0 ? '' : String(pago.monto));
+                  }}
                   onChange={(e) => {
                     let raw = e.target.value;
-                    if (raw === '' || raw === '0') {
-                      onPagoChange(idx, 'monto', raw);
-                      return;
-                    }
-                    raw = raw.replace(/^0+(?=\d)/, '');
-                    onPagoChange(idx, 'monto', raw);
+                    setEditMontoVal(raw);
+                    const parsed = parseSpanishNum(raw);
+                    onPagoChange(idx, 'monto', parsed);
                   }}
-                  onBlur={() => onMontoBlur(idx)}
+                  onBlur={() => {
+                    setEditMontoIdx(null);
+                    onMontoBlur(idx);
+                  }}
                   onClick={() => onFixMontoClick(idx)}
-                  className={`w-16 border rounded px-1.5 py-1 text-xs text-right ${montoToFixIndex === idx ? 'border-red bg-red-soft text-red' : 'border-line-input bg-input text-body'}`}
+                  className={`w-20 border rounded px-1.5 py-1 text-xs text-right ${montoToFixIndex === idx ? 'border-red bg-red-soft text-red' : 'border-line-input bg-input text-body'}`}
                   placeholder="0"
                 />
                 <input

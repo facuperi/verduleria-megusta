@@ -485,14 +485,7 @@ export const VentasPage = () => {
         return;
       }
     } else if (campo === 'monto') {
-      const raw = valor;
-      if (raw === '' || raw === '0') {
-        nuevosPagos[index] = { ...nuevosPagos[index], monto: raw };
-        setPagosSeleccionados(nuevosPagos);
-        return;
-      }
-      const cleaned = raw.replace(/^0+(?=\d)/, '');
-      const val = cleaned === '' ? 0 : parseFloat(cleaned) || 0;
+      const val = valor;
       nuevosPagos[index] = { ...nuevosPagos[index], monto: val };
       const sumaTotal = nuevosPagos.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
       if (Math.abs(sumaTotal - diferencia) > 0.01 && nuevosPagos.length > 1) {
