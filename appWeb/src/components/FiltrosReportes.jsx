@@ -49,6 +49,7 @@ export const FiltrosReportes = ({
   flashGreenId,
   filtroActivo, setFiltroActivo,
   filtrosUnicos,
+  filtrarFV, setFiltrarFV,
 }) => {
   const [mostrarSelectorProductos, setMostrarSelectorProductos] = useState(false);
   const productosFiltrados = productos.filter(p =>
@@ -159,33 +160,41 @@ export const FiltrosReportes = ({
               Productos {productosSeleccionados.length > 0 && `(${productosSeleccionados.length} seleccionados)`}
             </label>
 
-            {filtrosUnicos.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button
+                onClick={() => setFiltroActivo('todos')}
+                className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                  filtroActivo === 'todos'
+                    ? 'bg-amber text-white'
+                    : 'bg-elevated text-secondary hover:bg-amber-soft/30'
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setFiltrarFV(!filtrarFV)}
+                className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                  filtrarFV
+                    ? 'bg-green-600 text-white'
+                    : 'bg-elevated text-secondary hover:bg-green-500/20'
+                }`}
+              >
+                🥬 Frutas y Verduras
+              </button>
+              {filtrosUnicos.map(f => (
                 <button
-                  onClick={() => setFiltroActivo('todos')}
+                  key={f}
+                  onClick={() => setFiltroActivo(f)}
                   className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
-                    filtroActivo === 'todos'
+                    filtroActivo === f
                       ? 'bg-amber text-white'
                       : 'bg-elevated text-secondary hover:bg-amber-soft/30'
                   }`}
                 >
-                  Todos
+                  {f}
                 </button>
-                {filtrosUnicos.map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFiltroActivo(f)}
-                    className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
-                      filtroActivo === f
-                        ? 'bg-amber text-white'
-                        : 'bg-elevated text-secondary hover:bg-amber-soft/30'
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
 
             <div className="flex gap-2 mt-2">
               <div className="flex-1 relative">
@@ -279,6 +288,7 @@ export const FiltrosReportes = ({
             )}
           </div>
         )}
+
       </div>
 
       <div className="mt-4 flex gap-2">

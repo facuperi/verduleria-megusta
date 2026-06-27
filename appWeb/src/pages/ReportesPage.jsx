@@ -40,6 +40,7 @@ export const ReportesPage = () => {
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [facturaFilter, setFacturaFilter] = useState('todos');
   const [filtroActivo, setFiltroActivo] = useState('todos');
+  const [filtrarFV, setFiltrarFV] = useState(false);
   const [flashGreenId, setFlashGreenId] = useState(null);
   const [scanError, setScanError] = useState(null);
   const [varianteModal, setVarianteModal] = useState(null);
@@ -394,6 +395,12 @@ export const ReportesPage = () => {
       return productosVenta.some(pid => productosSeleccionados.includes(pid));
     })
     .filter(m => {
+      // Filtro Frutas y Verduras
+      if (!filtrarFV) return true;
+      if (m.origen !== 'ventas') return true;
+      return m.productos?.some(p => p.esFrutasVerduras);
+    })
+    .filter(m => {
       // Filtro por facturación
       if (tipoMovimiento !== 'ventasNC' && tipoMovimiento !== 'todos') return true;
       if (facturaFilter === 'facturadas') return !!m.cae;
@@ -613,6 +620,7 @@ export const ReportesPage = () => {
         flashGreenId={flashGreenId}
         filtroActivo={filtroActivo} setFiltroActivo={setFiltroActivo}
         filtrosUnicos={filtrosUnicos}
+        filtrarFV={filtrarFV} setFiltrarFV={setFiltrarFV}
       />
 
       {movimientosFiltrados.length > 0 && (
