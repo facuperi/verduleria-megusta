@@ -65,8 +65,14 @@ export const Layout = ({ children }) => {
         <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
           <div className="flex flex-col flex-1 min-h-0 bg-sidebar border-r border-line">
             <div className="flex items-center gap-3 px-6 py-5 border-b border-line">
-              <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm">M</span>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="36" height="36">
+                  <circle cx="32" cy="36" r="22" fill="#e53935"/>
+                  <path d="M32 14c-2-6-8-10-14-10" fill="none" stroke="#43a047" stroke-width="3" stroke-linecap="round"/>
+                  <ellipse cx="26" cy="30" rx="3" ry="2" fill="#c62828" opacity="0.5"/>
+                  <ellipse cx="38" cy="30" rx="3" ry="2" fill="#c62828" opacity="0.5"/>
+                  <path d="M28 40c0 0 2 3 4 3s4-3 4-3" fill="none" stroke="#c62828" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
               </div>
               <div>
                 <h1 className="text-base font-bold text-body leading-tight">ME GUSTA</h1>
@@ -129,8 +135,14 @@ export const Layout = ({ children }) => {
           <div className="relative flex flex-col flex-1 max-w-xs w-full bg-sidebar">
             <div className="flex items-center justify-between px-4 py-4 border-b border-line">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-xs">M</span>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32">
+                    <circle cx="32" cy="36" r="22" fill="#e53935"/>
+                    <path d="M32 14c-2-6-8-10-14-10" fill="none" stroke="#43a047" stroke-width="3" stroke-linecap="round"/>
+                    <ellipse cx="26" cy="30" rx="3" ry="2" fill="#c62828" opacity="0.5"/>
+                    <ellipse cx="38" cy="30" rx="3" ry="2" fill="#c62828" opacity="0.5"/>
+                    <path d="M28 40c0 0 2 3 4 3s4-3 4-3" fill="none" stroke="#c62828" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
                 </div>
                 <div>
                   <h1 className="text-sm font-bold text-body leading-tight">ME GUSTA</h1>
@@ -203,8 +215,14 @@ export const Layout = ({ children }) => {
                 </svg>
               </button>
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-[10px]">M</span>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28">
+                    <circle cx="32" cy="36" r="22" fill="#e53935"/>
+                    <path d="M32 14c-2-6-8-10-14-10" fill="none" stroke="#43a047" stroke-width="3" stroke-linecap="round"/>
+                    <ellipse cx="26" cy="30" rx="3" ry="2" fill="#c62828" opacity="0.5"/>
+                    <ellipse cx="38" cy="30" rx="3" ry="2" fill="#c62828" opacity="0.5"/>
+                    <path d="M28 40c0 0 2 3 4 3s4-3 4-3" fill="none" stroke="#c62828" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
                 </div>
                 <span className="font-bold text-body text-sm">ME GUSTA</span>
               </div>

@@ -115,7 +115,7 @@ export const VentasPage = () => {
   const [cuitCliente, setCuitCliente] = useState('');
   
   // Métodos de pago seleccionados
-  const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
+  const [pagosSeleccionados, setPagosSeleccionados] = useState([{ metodo: 'efectivo', monto: '', descuentoTipo: null, descuentoValor: 0 }]);
   const [scanError, setScanError] = useState(null);
   const [flashGreenId, setFlashGreenId] = useState(null);
   const [varianteModal, setVarianteModal] = useState(null);
@@ -485,7 +485,14 @@ export const VentasPage = () => {
         return;
       }
     } else if (campo === 'monto') {
-      const val = parseFloat(valor) || 0;
+      const raw = valor;
+      if (raw === '' || raw === '0') {
+        nuevosPagos[index] = { ...nuevosPagos[index], monto: raw };
+        setPagosSeleccionados(nuevosPagos);
+        return;
+      }
+      const cleaned = raw.replace(/^0+(?=\d)/, '');
+      const val = cleaned === '' ? 0 : parseFloat(cleaned) || 0;
       nuevosPagos[index] = { ...nuevosPagos[index], monto: val };
       const sumaTotal = nuevosPagos.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
       if (Math.abs(sumaTotal - diferencia) > 0.01 && nuevosPagos.length > 1) {
@@ -544,7 +551,7 @@ export const VentasPage = () => {
     const metodosExistentes = pagosSeleccionados.map(p => p.metodo);
     const primerDisponible = METODOS_PAGO.find(m => !metodosExistentes.includes(m.id));
     if (!primerDisponible) return;
-    const nuevosPagos = [...pagosSeleccionados, { metodo: primerDisponible.id, monto: 0, descuentoTipo: null, descuentoValor: 0 }];
+    const nuevosPagos = [...pagosSeleccionados, { metodo: primerDisponible.id, monto: '', descuentoTipo: null, descuentoValor: 0 }];
     autoAjustarMontos(nuevosPagos, nuevosPagos.length - 1);
     setPagosSeleccionados(nuevosPagos);
   };
@@ -823,7 +830,7 @@ export const VentasPage = () => {
       setProductos(productosActualizados.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       
       setCarrito([]);
-      setPagosSeleccionados([{ metodo: 'efectivo', monto: 0, descuentoTipo: null, descuentoValor: 0 }]);
+      setPagosSeleccionados([{ metodo: 'efectivo', monto: '', descuentoTipo: null, descuentoValor: 0 }]);
       setMontoToFixIndex(null);
       setObservacion('');
       setFacturaData(null);

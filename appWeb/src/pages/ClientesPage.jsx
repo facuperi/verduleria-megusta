@@ -35,7 +35,7 @@ export const ClientesPage = () => {
   const [procesando, setProcesando] = useState(false);
   const [showPagoModal, setShowPagoModal] = useState(false);
   const [clientePago, setClientePago] = useState(null);
-  const [montoPago, setMontoPago] = useState('');
+  const [montoPagoCents, setMontoPagoCents] = useState(0);
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [pagoProcesando, setPagoProcesando] = useState(false);
   const [showClienteModal, setShowClienteModal] = useState(false);
@@ -154,8 +154,18 @@ export const ClientesPage = () => {
     return res.json();
   };
 
+  const handleMontoPagoKeyDown = (e) => {
+    if (e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      setMontoPagoCents(prev => Math.min(prev * 10 + parseInt(e.key), 9999999));
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      setMontoPagoCents(prev => Math.floor(prev / 10));
+    }
+  };
+
   const handlePagoDeuda = async () => {
-    const monto = parseFloat(montoPago);
+    const monto = montoPagoCents / 100;
     if (!monto || monto <= 0) { showToast('Ingresá un monto válido', 'error'); return; }
     if (monto > (clientePago.deuda || 0)) { showToast('El monto supera la deuda del cliente', 'error'); return; }
     setPagoProcesando(true);
@@ -502,7 +512,15 @@ export const ClientesPage = () => {
           <>
             <div className="mb-3">
               <label className="block text-sm font-bold mb-1">Monto</label>
-              <input type="number" step="0.01" value={montoPago} onChange={(e) => setMontoPago(e.target.value)} placeholder="0.00" className="w-full border border-line-input bg-input text-body p-2 rounded" autoFocus />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={(montoPagoCents / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                onKeyDown={handleMontoPagoKeyDown}
+                placeholder="0,00"
+                className="w-full border border-line-input bg-input text-body p-2 rounded text-right"
+                autoFocus
+              />
             </div>
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1">Método de pago</label>

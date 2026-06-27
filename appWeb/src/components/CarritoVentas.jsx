@@ -135,7 +135,7 @@ export const CarritoVentas = ({
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={pesoEditId === item._key ? (pesoGrams / 1000).toFixed(3) : Number(item.peso || 0).toFixed(3)}
+                        value={pesoEditId === item._key ? (pesoGrams / 1000).toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : Number(item.peso || 0).toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                         onFocus={() => { setPesoEditId(item._key); setPesoGrams(Math.round((item.peso || 0) * 1000)); }}
                         onKeyDown={(e) => handlePesoKeyDown(e, item._key)}
                         onBlur={() => handlePesoBlur(item._key)}
@@ -273,9 +273,18 @@ export const CarritoVentas = ({
                   ))}
                 </select>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={pago.monto}
-                  onChange={(e) => onPagoChange(idx, 'monto', e.target.value)}
+                  onChange={(e) => {
+                    let raw = e.target.value;
+                    if (raw === '' || raw === '0') {
+                      onPagoChange(idx, 'monto', raw);
+                      return;
+                    }
+                    raw = raw.replace(/^0+(?=\d)/, '');
+                    onPagoChange(idx, 'monto', raw);
+                  }}
                   onBlur={() => onMontoBlur(idx)}
                   onClick={() => onFixMontoClick(idx)}
                   className={`w-16 border rounded px-1.5 py-1 text-xs text-right ${montoToFixIndex === idx ? 'border-red bg-red-soft text-red' : 'border-line-input bg-input text-body'}`}

@@ -26,21 +26,21 @@ export const BuscadorProductos = ({
           onClick={() => onProductClick({ id: '__frutas_verduras__', nombre: 'Frutas y Verduras', tipo: 'frutasVerduras', precio: 0 })}
           className="bg-card p-3 rounded-lg shadow-sm border-2 border-amber border-dashed cursor-pointer hover:bg-amber-soft/30 flex flex-col items-center justify-center min-h-[80px]"
         >
-          <h4 className="font-semibold text-sm mt-1">Frutas y Verduras</h4>
+          <h4 className="font-semibold text-sm mt-1">🍎 Frutas y Verduras</h4>
           <span className="text-xs text-amber font-medium">Total del ticket</span>
         </div>
         <div
           onClick={() => onProductClick({ id: '__huevos__', nombre: 'Huevos', tipo: 'huevos', precio: 0 })}
           className="bg-card p-3 rounded-lg shadow-sm border-2 border-amber border-dashed cursor-pointer hover:bg-amber-soft/30 flex flex-col items-center justify-center min-h-[80px]"
         >
-          <h4 className="font-semibold text-sm mt-1">Huevos</h4>
+          <h4 className="font-semibold text-sm mt-1">🥚 Huevos</h4>
           <span className="text-xs text-amber font-medium">Elegir presentación</span>
         </div>
         <div
           onClick={() => onProductClick({ id: '__lena_carbon__', nombre: 'Leña y Carbón', tipo: 'lenaCarbon', precio: 0 })}
           className="bg-card p-3 rounded-lg shadow-sm border-2 border-amber border-dashed cursor-pointer hover:bg-amber-soft/30 flex flex-col items-center justify-center min-h-[80px]"
         >
-          <h4 className="font-semibold text-sm mt-1">Leña y Carbón</h4>
+          <h4 className="font-semibold text-sm mt-1">🪵 Leña y Carbón</h4>
           <span className="text-xs text-amber font-medium">Elegir opción</span>
         </div>
       </div>

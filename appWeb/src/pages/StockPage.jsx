@@ -60,7 +60,7 @@ export const StockPage = () => {
     codigoBarras: '',
     nombre: '',
     precio: '',
-    stock: 0,
+    stock: '',
     filtro: '',
   });
 
@@ -72,7 +72,7 @@ export const StockPage = () => {
       codigoBarras: '',
       nombre: '',
       precio: '',
-      stock: 0,
+      stock: '',
       filtro: '',
     });
     setTieneCodigo(false);
@@ -569,10 +569,18 @@ export const StockPage = () => {
               Precio {esPesable(formData.tipo) ? 'por kg' : ''}
             </label>
             <input
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={formData.precio}
-              onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
+              onChange={(e) => {
+                let v = e.target.value;
+                if (v === '' || v === '0') {
+                  setFormData(prev => ({ ...prev, precio: v }));
+                  return;
+                }
+                v = v.replace(/^0+(?=\d)/, '');
+                setFormData(prev => ({ ...prev, precio: v }));
+              }}
               className="w-full border border-line-input bg-input text-body p-2 rounded"
               required
             />
@@ -587,7 +595,7 @@ export const StockPage = () => {
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={stockScaleActive ? (stockScaleGrams / 1000).toFixed(3) : Number(formData.stock || 0).toFixed(3)}
+                  value={stockScaleActive ? (stockScaleGrams / 1000).toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : Number(formData.stock || 0).toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                   onFocus={() => { setStockScaleActive(true); setStockScaleGrams(Math.round((formData.stock || 0) * 1000)); }}
                   onKeyDown={handleStockScaleKeyDown}
                   onBlur={() => {
@@ -600,10 +608,18 @@ export const StockPage = () => {
                 />
               ) : (
                 <input
-                  type="number"
-                  step="1"
+                  type="text"
+                  inputMode="numeric"
                   value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '' || v === '0') {
+                      setFormData(prev => ({ ...prev, stock: v }));
+                      return;
+                    }
+                    const cleaned = v.replace(/^0+(?=\d)/, '');
+                    setFormData(prev => ({ ...prev, stock: cleaned }));
+                  }}
                   className="w-full border border-line-input bg-input text-body p-2 rounded"
                 />
               )}

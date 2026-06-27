@@ -257,7 +257,7 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={scaleEditId === item.id ? (scaleGrams / 1000).toFixed(3) : Number(item.cantidad || 0).toFixed(3)}
+                      value={scaleEditId === item.id ? (scaleGrams / 1000).toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : Number(item.cantidad || 0).toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                       onFocus={() => { setScaleEditId(item.id); setScaleGrams(Math.round((item.cantidad || 0) * 1000)); }}
                       onKeyDown={handlePesoKeyDown}
                       onBlur={() => {
@@ -270,11 +270,18 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
                     />
                   ) : (
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="text"
+                      inputMode="numeric"
                       value={item.cantidad}
-                      onChange={(e) => cambiarCantidad(item.id, e.target.value)}
+                      onChange={(e) => {
+                        let v = e.target.value;
+                        if (v === '' || v === '0') {
+                          cambiarCantidad(item.id, v);
+                          return;
+                        }
+                        v = v.replace(/^0+(?=\d)/, '');
+                        cambiarCantidad(item.id, v);
+                      }}
                       className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
                     />
                   )}
