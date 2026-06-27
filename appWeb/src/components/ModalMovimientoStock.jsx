@@ -31,6 +31,8 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
   const [historialLimit, setHistorialLimit] = useState(10);
   const [scaleEditId, setScaleEditId] = useState(null);
   const [scaleGrams, setScaleGrams] = useState(0);
+  const [editCantIdx, setEditCantIdx] = useState(null);
+  const [editCantVal, setEditCantVal] = useState('');
 
   const handlePesoKeyDown = useCallback((e) => {
     if (e.key >= '0' && e.key <= '9') {
@@ -272,16 +274,18 @@ export const ModalMovimientoStock = ({ open, onClose, productos, onProductosActu
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={item.cantidad}
+                      value={editCantIdx === item.id ? editCantVal : (item.cantidad === 0 ? '' : Number(item.cantidad).toLocaleString('es-AR'))}
+                      onFocus={() => {
+                        setEditCantIdx(item.id);
+                        setEditCantVal(item.cantidad === 0 ? '' : String(item.cantidad));
+                      }}
                       onChange={(e) => {
                         let v = e.target.value;
-                        if (v === '' || v === '0') {
-                          cambiarCantidad(item.id, v);
-                          return;
-                        }
-                        v = v.replace(/^0+(?=\d)/, '');
-                        cambiarCantidad(item.id, v);
+                        setEditCantVal(v);
+                        const parsed = parseInt(v.replace(/\./g, ''), 10);
+                        cambiarCantidad(item.id, isNaN(parsed) ? 0 : parsed);
                       }}
+                      onBlur={() => setEditCantIdx(null)}
                       className="w-16 border border-line-input bg-input text-body p-1 rounded text-center text-xs"
                     />
                   )}

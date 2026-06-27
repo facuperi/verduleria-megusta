@@ -44,6 +44,8 @@ export const StockPage = () => {
 
   const [stockScaleGrams, setStockScaleGrams] = useState(0);
   const [stockScaleActive, setStockScaleActive] = useState(false);
+  const [stockEditActive, setStockEditActive] = useState(false);
+  const [stockEditVal, setStockEditVal] = useState('');
 
   const handleStockScaleKeyDown = useCallback((e) => {
     if (e.key >= '0' && e.key <= '9') {
@@ -610,16 +612,22 @@ export const StockPage = () => {
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={formData.stock}
+                  value={stockEditActive ? stockEditVal : (formData.stock === '' || formData.stock === 0 ? '' : Number(formData.stock).toLocaleString('es-AR'))}
+                  onFocus={() => {
+                    setStockEditActive(true);
+                    setStockEditVal(formData.stock === '' || formData.stock === 0 ? '' : String(formData.stock));
+                  }}
                   onChange={(e) => {
                     const v = e.target.value;
+                    setStockEditVal(v);
                     if (v === '' || v === '0') {
                       setFormData(prev => ({ ...prev, stock: v }));
                       return;
                     }
-                    const cleaned = v.replace(/^0+(?=\d)/, '');
+                    const cleaned = v.replace(/\./g, '').replace(/^0+(?=\d)/, '');
                     setFormData(prev => ({ ...prev, stock: cleaned }));
                   }}
+                  onBlur={() => setStockEditActive(false)}
                   className="w-full border border-line-input bg-input text-body p-2 rounded"
                 />
               )}
