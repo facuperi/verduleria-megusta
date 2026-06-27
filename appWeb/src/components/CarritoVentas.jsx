@@ -306,9 +306,19 @@ export const CarritoVentas = ({
                   placeholder="0"
                 />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={pago.descuentoValor}
-                  onChange={(e) => onPagoChange(idx, 'descuentoValor', e.target.value)}
+                  onChange={(e) => {
+                    let raw = e.target.value;
+                    if (raw === '' || raw === '0') {
+                      onPagoChange(idx, 'descuentoValor', raw);
+                      return;
+                    }
+                    raw = raw.replace(/\./g, '').replace(',', '.');
+                    raw = raw.replace(/^0+(?=\d)/, '');
+                    onPagoChange(idx, 'descuentoValor', raw);
+                  }}
                   className={`w-12 border border-line-input bg-input text-body rounded px-1.5 py-1 text-xs text-right ${!pago.descuentoTipo ? 'opacity-40' : ''}`}
                   placeholder="0"
                   disabled={!pago.descuentoTipo}
